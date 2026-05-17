@@ -14,6 +14,63 @@ unchanged.
 
 ---
 
+## Part 0 — The non-interruption rule (load-bearing prerequisite)
+
+> **A loop fire is a SIGNAL to continue, not a command to start
+> something new. Finish what you're doing, then address the
+> loop.**
+
+Every other pattern in this doc assumes this is in place.
+Without it, no stop condition fires correctly (work is always
+"in progress" because nothing finishes), and no interval
+strategy holds (the agent constantly drops mid-task work to
+re-react to the re-injected prompt).
+
+What this means in practice:
+
+| Scenario | Right behavior |
+|---|---|
+| Loop fires while agent is editing a file | Finish the edit, save, commit — THEN read the new prompt. |
+| Loop fires while agent is running tests | Wait for the test results. The 1-min cron fires again; the test takes 90s; the second fire arrives and tests are still running; finish them, commit, then handle the prompt. |
+| Loop fires with a new explicit user message attached | Inject the message as a `TaskCreate` (don't context-switch). Finish current work. Address the new task when it surfaces via TaskList ordering. |
+| Loop fires and `TaskList` shows an `in_progress` task | Continue that task. The loop's "TASK PRIORITY" ordering applies only when *nothing* is in flight. |
+| Loop fires and there's a half-written commit | Finish + commit + push. The loop's stop conditions can't fire correctly with uncommitted work in the tree. |
+| Loop fires and `TaskList` is empty | THIS is when the loop's priority list takes effect. Pick the next task per the prompt's ordering. |
+
+Why this matters: cron has no concept of "is the agent busy?"
+It fires on a schedule regardless. The agent's job is to treat
+the fire as a *reminder to keep working*, not a *fresh
+instruction*. Without this discipline:
+
+- Commits get half-staged, half-pushed, leaving repos in
+  inconsistent states across iterations
+- Test runs get interrupted, producing false-negative CI runs
+- Tasks accumulate as the agent restarts the same work each
+  minute
+- The transcript fills with "let me start X" / "actually let me
+  start Y" / "wait, the loop said do Z" without anything
+  actually shipping
+
+The skills support this: `/loop-edit` doesn't fire the prompt
+immediately (per its spec), `/loop-pause` preserves state, and
+the prompt convention says "SELF-CHECKS FIRST" to nudge agents
+toward task-list-based continuity rather than reflexive
+re-acting.
+
+If you're the operator writing a loop prompt: lead with
+SELF-CHECKS that start with `TaskList`. If you're the agent
+participating in a loop: when a fire arrives, read `TaskList`
+before reading the prompt body. This single habit accounts for
+most of the value the toolkit provides.
+
+See also: [`CLAUDE.md`](../CLAUDE.md) at the repo root — the
+canonical contract for agents participating in any loop
+produced by this toolkit. The README's "non-interruption rule"
+section is the executive summary; CLAUDE.md is the full
+treatment.
+
+---
+
 ## Part 1 — Stop conditions
 
 Cron jobs in this toolkit auto-expire after 7 days. Until then

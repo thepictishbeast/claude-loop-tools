@@ -35,6 +35,41 @@ skills:
 History is appended to `~/.claude/loop-history.jsonl` on every
 pause/resume/edit/stop — append-only, one JSON line per event.
 
+## The non-interruption rule (please read first)
+
+> **A loop fire is a SIGNAL to continue, not a command to start
+> something new.** If your agent is mid-task when the loop fires,
+> finish that task first. The loop will fire again in N minutes;
+> the work waits.
+
+This is the single load-bearing discipline that makes loops
+useful instead of disruptive. Without it, agents drop mid-work
+to "act on" the re-injected prompt, duplicate effort across
+iterations, and ship half-finished commits.
+
+Concrete rules:
+
+1. **Loop fires don't interrupt current tool calls.** Finish
+   the call, *then* read the prompt.
+2. **In-flight tasks have priority over the loop prompt.** If
+   `TaskList` shows an `in_progress` task, continue it. The
+   prompt's TASK PRIORITY list applies only when nothing is
+   in-flight.
+3. **Mid-iter user messages are tracked, not acted on
+   immediately.** The user typing while the agent is editing a
+   file should produce a new `TaskCreate`, not a context
+   switch.
+4. **Re-injection is not a new directive.** The cron-injected
+   prompt is verbose by design. The same text every fire means
+   "standing posture" not "fresh instruction."
+5. **Tight ticks → one-line health check, no log entry unless
+   state changed.** Idle fires that produce no work should
+   leave no trace.
+
+[`CLAUDE.md`](./CLAUDE.md) is the canonical contract — every
+loop participant (AI agent or human operator) reads it before
+starting work. The rules above are the executive summary.
+
 ## Patterns (general-purpose loop design)
 
 See [`docs/LOOP_PATTERNS.md`](./docs/LOOP_PATTERNS.md) for the
