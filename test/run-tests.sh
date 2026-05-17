@@ -240,6 +240,68 @@ fi
 
 # ----------------------------------------------------------------------
 echo ""
+echo "[7c] checkpoint + restore skills (full-session state save/load)"
+
+for skill in checkpoint restore; do
+    if [ -f "skills/$skill/SKILL.md" ]; then
+        pass "skill: $skill exists"
+    else
+        fail "skill: $skill missing"
+        continue
+    fi
+    declared="$(awk '/^---$/{c++; if(c==2)exit} c==1 && /^name: /{print $2; exit}' "skills/$skill/SKILL.md")"
+    if [ "$declared" = "$skill" ]; then
+        pass "skill: $skill frontmatter name matches dir"
+    else
+        fail "skill: $skill frontmatter name is '$declared' (want '$skill')"
+    fi
+done
+
+# checkpoint must document the .checkpoint/ state dir
+if grep -qF '.checkpoint/' skills/checkpoint/SKILL.md; then
+    pass "checkpoint: documents ~/.claude/.checkpoint/ state dir"
+else
+    fail "checkpoint: missing .checkpoint/ state dir reference"
+fi
+
+# checkpoint must list the captured artifacts (tasks, loops, processes, git)
+for kind in tasks loops process git; do
+    if grep -qi "$kind" skills/checkpoint/SKILL.md; then
+        pass "checkpoint: captures $kind"
+    else
+        fail "checkpoint: doesn't mention capturing $kind"
+    fi
+done
+
+# restore must reverse what checkpoint did
+if grep -qiE "TaskCreate|re-create.*tasks" skills/restore/SKILL.md; then
+    pass "restore: re-creates tasks"
+else
+    fail "restore: missing task re-create"
+fi
+
+if grep -qiE "/loop-resume|paused-loops.json" skills/restore/SKILL.md; then
+    pass "restore: invokes /loop-resume"
+else
+    fail "restore: missing /loop-resume invocation"
+fi
+
+# restore must delete the checkpoint after consuming it
+if grep -qiE "delete.*checkpoint|remove.*checkpoint|single.shot" skills/restore/SKILL.md; then
+    pass "restore: deletes checkpoint after consuming"
+else
+    fail "restore: doesn't delete checkpoint on success"
+fi
+
+# CONTRIBUTING.md must exist + welcome AI agents
+if [ -f CONTRIBUTING.md ] && grep -qiE "AI agent|Claude|Codex|Cursor" CONTRIBUTING.md; then
+    pass "CONTRIBUTING.md: welcomes AI-agent contributors"
+else
+    fail "CONTRIBUTING.md: missing or doesn't welcome AI agents"
+fi
+
+# ----------------------------------------------------------------------
+echo ""
 echo "[7b] loop-edit + loop-stop skills"
 
 for skill in loop-edit loop-stop; do

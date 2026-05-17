@@ -24,6 +24,13 @@ skills:
   resumable). Use for "I'm done with this loop, clean up."
 - **`/loops`** — show a unified view of active + paused + recent
   history (last 20 events).
+- **`/checkpoint`** — save FULL session state (tasks + active loops
+  + background processes + dirty git trees + handoff note) to
+  `~/.claude/.checkpoint/`. Use before you `/exit` so you can pick up
+  exactly where you left off.
+- **`/restore`** — first command of a new session. Reads the
+  `~/.claude/.checkpoint/` state, re-creates the TaskList, resumes
+  paused loops, shows the handoff note, then deletes the checkpoint.
 
 History is appended to `~/.claude/loop-history.jsonl` on every
 pause/resume/edit/stop — append-only, one JSON line per event.
@@ -61,6 +68,11 @@ $EDITOR ~/.claude/.paused-loops.json    # hand-edit anything before resume
 
 # Permanent stop:
 /loop-stop                              # delete cron + clear state
+
+# Full session restart (paul wants to relaunch Claude Code):
+/checkpoint                             # save tasks, loops, bg procs, notes
+# then /exit + relaunch Claude Code (use --continue for chat history)
+/restore                                # first command in new session
 ```
 
 ## Editing the prompt or cron of a paused loop
