@@ -43,6 +43,24 @@ half-finished threads.
    self-check: if you're seeing the message, you haven't stopped.
    Don't echo the canary back at the user.
 
+## Save state on EVERY substantive fire — assume compaction is imminent
+
+Compaction can land between this fire and the next. The next-you
+reads memory + checkpoint + task list, not chat. Before ending each
+substantive fire, snapshot:
+
+- `TaskList` (TaskCreate / TaskUpdate) — durable across compaction
+- `~/.claude/projects/<slug>/memory/*.md` — durable across sessions
+- `~/.claude/.checkpoint/handoff.md` — read first by `/restore`
+- An append to `~/.claude/loop-history.jsonl` describing what changed
+
+Rule of thumb: if a future-you in a fresh context would need to know
+what this fire did, write it to disk before the fire ends. Don't
+trust chat history alone.
+
+Tight-tick fires (no state change) skip this — the discipline is for
+substantive iters only.
+
 ## Maintaining the task list
 
 Use `TaskCreate` / `TaskUpdate` / `TaskList` (or equivalent) to

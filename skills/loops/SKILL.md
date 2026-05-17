@@ -17,7 +17,26 @@ When the user invokes this skill:
 3. **History** — read last 20 lines (or fewer) from
    `$HOME/.claude/loop-history.jsonl`. If missing, history is empty.
 
-4. **Inflight tasks** (added 2026-05-17): if `TaskList` is available
+4. **Untracked-cron discovery** (added 2026-05-17): for each active
+   cron from step 1, check whether the history has any
+   `created` / `resumed` / `discovered` / `paused` event with a
+   matching `id` (current or `id_new`/`id_original` from earlier
+   pause-resume cycles). If a cron has NO history entry, it was
+   created outside this toolkit (raw `/loop`, prior session,
+   inherited). Append a `discovered` event to the history file:
+
+   ```jsonl
+   {"event":"discovered","at":"<ISO-8601>","id":"<cron-id>","cron":"<expr>","cadence_human":"<human>","prompt":"<full prompt from CronList>","reason":"side-effect of /loops auto-discovery"}
+   ```
+
+   This is the ONE state mutation this skill is allowed (see "Don't"
+   below — read-only EXCEPT for discovery audit log). The mutation
+   makes future `/loops`, `/loop-pause`, and `/loop-edit` runs see
+   prior context. Skip the append if CronList prompt is truncated
+   to ~80 chars AND you cannot reconstruct full text — log a
+   `discovered-truncated` event instead, with a note for the user.
+
+5. **Inflight tasks**: if `TaskList` is available
    in this environment, call it and capture the current task state.
    Loops without an attached task list tend to drift / restart work.
    Showing the task list inline with loop status helps the agent
@@ -67,7 +86,10 @@ confirm). Don't touch active or paused state.
 
 ## Don't
 
-- Don't modify any state files. This skill is read-only.
+- Don't modify any state files. This skill is read-only EXCEPT for
+  the auto-discovery append described in step 4 — that is the single
+  intentional mutation (and it's append-only audit log, not
+  destructive).
 - Don't call CronCreate or CronDelete. Those are /loop-resume's and
   /loop-pause's jobs.
 - Don't call TaskCreate / TaskUpdate / TaskStop — read only. The

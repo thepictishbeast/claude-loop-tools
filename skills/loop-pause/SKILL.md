@@ -19,6 +19,26 @@ When the user invokes this skill:
 3. **If no active jobs**: tell the user "No active cron jobs to pause."
    Don't touch the state file. Stop.
 
+3a. **In-flight TaskList check** (added 2026-05-17): if `TaskList` is
+    available in this environment, call it. If any task has status
+    `in_progress`, surface them to the user BEFORE pausing:
+
+    ```
+    The following tasks are mid-flight:
+      #3 [in_progress] Refactor mailer pool
+
+    Pausing the loop won't pause your task work, but the next /loop-resume
+    won't auto-resume those tasks (TaskList is session-scoped).
+    Continue with pause? [y/N]
+    ```
+
+    If the user passes `--force` (e.g. `/loop-pause --force`), skip the
+    confirmation. If the user declines, abort without state mutation.
+
+    When pausing proceeds with in-flight tasks, record their snapshot
+    in the saved entry's `inflight_tasks` field (see step 7) so
+    /loop-resume can replay context.
+
 4. **For each active job**, capture from the CronList output:
    - Job ID (e.g. `8dfaf6a4`)
    - Cron expression (parse from the cadence — convert "Every minute"
@@ -61,12 +81,24 @@ When the user invokes this skill:
        "prompt": "<full prompt verbatim>",
        "canary_added": true,
        "paused_at": "2026-05-17T05:40:00Z",
-       "label": "optional short label - infer from prompt's first sentence"
+       "label": "optional short label - infer from prompt's first sentence",
+       "inflight_tasks": [
+         {"id": "3", "status": "in_progress", "subject": "Refactor mailer pool", "activeForm": "Refactoring mailer pool"}
+       ]
      }
    ]
    ```
-   Use Write tool. Then `chmod 600` the file via Bash (prompts may
-   contain sensitive context).
+   Use Write tool with **`flock(1)`** on `~/.claude/.paused-loops.lock`
+   to prevent concurrent /loop-pause runs from racing. Pseudocode:
+   ```sh
+   flock -w 5 ~/.claude/.paused-loops.lock -c 'write the JSON'
+   ```
+   Then `chmod 600` the file via Bash (prompts may contain sensitive
+   context). Same flock pattern applies to the history append in step 8.
+
+   `inflight_tasks` is OPTIONAL — only present when step 3a recorded
+   tasks; absent or `[]` otherwise. Empty array = no in-flight tasks
+   at pause time.
 
 8. **Append history event** to `~/.claude/loop-history.jsonl` (create
    if missing). Format — one JSON object per line:

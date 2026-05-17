@@ -396,5 +396,64 @@ fi
 
 # ----------------------------------------------------------------------
 echo ""
+echo "[9] New skills (loop-update / loop-track / loop-from-task / loop-on / loop-health)"
+for skill in loop-update loop-track loop-from-task loop-on loop-health; do
+    if [ -f "skills/$skill/SKILL.md" ]; then
+        pass "skill: $skill exists"
+    else
+        fail "skill: $skill missing"
+        continue
+    fi
+    declared=$(awk '/^name:/{print $2; exit}' "skills/$skill/SKILL.md")
+    if [ "$declared" = "$skill" ]; then
+        pass "skill: $skill frontmatter name matches dir"
+    else
+        fail "skill: $skill frontmatter name is '$declared' (want '$skill')"
+    fi
+done
+
+if grep -q "auto-discovery" skills/loops/SKILL.md; then
+    pass "loops: auto-discovery step documented"
+else
+    fail "loops: missing auto-discovery step"
+fi
+
+if grep -q "Auto-update claude-loop-tools" skills/restore/SKILL.md; then
+    pass "restore: auto-update step documented"
+else
+    fail "restore: missing auto-update step"
+fi
+
+if grep -q "In-flight TaskList check" skills/loop-pause/SKILL.md; then
+    pass "loop-pause: in-flight TaskList check documented"
+else
+    fail "loop-pause: missing in-flight check"
+fi
+
+if grep -q "inflight_tasks" skills/loop-resume/SKILL.md; then
+    pass "loop-resume: inflight_tasks replay documented"
+else
+    fail "loop-resume: missing inflight_tasks replay"
+fi
+
+if [ -x lib/rotate-history.sh ] && bash -n lib/rotate-history.sh; then
+    pass "lib/rotate-history.sh: present + parses"
+else
+    fail "lib/rotate-history.sh: missing or syntax-broken"
+fi
+
+if [ -x update.sh ] && bash -n update.sh; then
+    pass "update.sh: present + parses"
+else
+    fail "update.sh: missing or syntax-broken"
+fi
+
+if grep -q "Save state on EVERY" CLAUDE.md; then
+    pass "CLAUDE.md: save-state-on-fire rule documented"
+else
+    fail "CLAUDE.md: missing save-state rule"
+fi
+
+echo ""
 echo "summary: $PASS pass, $FAIL fail"
 [ "$FAIL" -eq 0 ]
