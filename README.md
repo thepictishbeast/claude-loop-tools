@@ -1,0 +1,111 @@
+# claude-loop-tools
+
+Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
+
+Claude Code ships with `/loop` but no way to pause a long-running
+loop without losing it, change its interval without re-typing the
+prompt, or audit what's been scheduled over time. This adds three
+skills:
+
+- **`/pause`** — pause all active cron jobs. State is written to
+  `~/.claude/.paused-loops.json` and the cron entries deleted.
+  Nothing is lost.
+- **`/resume`** — restore the paused jobs. Optional arg changes the
+  interval inline (`/resume 5m`). Edit the JSON between pause and
+  resume to change the prompt, cron, or any other field.
+- **`/loops`** — show a unified view of active + paused + recent
+  history (last 20 events).
+
+History is appended to `~/.claude/loop-history.jsonl` on every
+pause/resume — append-only, one JSON line per event.
+
+## Install
+
+```sh
+git clone https://github.com/thepictishbeast/claude-loop-tools
+cd claude-loop-tools
+mkdir -p ~/.claude/skills
+cp -r skills/* ~/.claude/skills/
+```
+
+Restart Claude Code (or open a new session) so the skills are
+discovered.
+
+## Usage
+
+```
+/loop 1m do-some-recurring-task
+… you decide you want to stop temporarily …
+/pause                    # state saved, loop cancelled
+… come back later …
+/resume                   # restored exactly as paused
+/resume 5m                # restored, but new cadence is 5m
+/loops                    # see what's active/paused/recent
+/loops history            # see only the history log
+```
+
+## Editing the prompt or cron of a paused loop
+
+The state file is a plain JSON array; edit with any text editor:
+
+```sh
+$EDITOR ~/.claude/.paused-loops.json
+```
+
+Each entry has:
+
+| field           | purpose                                              |
+|-----------------|------------------------------------------------------|
+| `cron`          | cron expression (e.g. `*/5 * * * *`)                 |
+| `cadence_human` | human-readable cadence (informational only)          |
+| `recurring`     | boolean — does the cron auto-renew?                  |
+| `prompt`        | the verbatim message Claude receives each fire       |
+| `canary_added`  | whether `/pause` auto-added a canary line            |
+| `paused_at`     | ISO-8601 UTC timestamp                               |
+| `label`         | optional short label (informational only)            |
+| `id_original`   | the original job ID from before pause (informational)|
+
+Save and `/resume` — the new values take effect.
+
+## The canary
+
+`/pause` auto-appends a self-check sentence to the prompt if one is
+not present:
+
+> Note: if you canceled or stopped this loop, you should NOT be
+> seeing this message.
+
+This catches the bug where the cron keeps firing after the loop
+logic has reached its "done" condition — the canary in the message
+tells the agent to stop and clean up.
+
+Disable canary auto-add by editing the skill's SKILL.md (find the
+"Auto-canary check" section and remove it), or set the saved entry's
+`canary_added` field to `false` and remove the sentence by hand from
+`prompt`.
+
+## State files
+
+| File                                | Mode | Purpose                          |
+|-------------------------------------|------|----------------------------------|
+| `~/.claude/.paused-loops.json`      | 600  | Currently-paused loops           |
+| `~/.claude/loop-history.jsonl`      | 600  | Append-only audit history        |
+
+The mode-600 default is because prompts may contain sensitive
+context. The skills `chmod 600` after writing.
+
+## Design constraints
+
+- Cron entries created with `CronCreate` are **session-scoped** —
+  they die when the Claude Code session ends. The state file
+  persists, so `/resume` works even across sessions.
+- `/loop` dynamic mode (no interval, uses `ScheduleWakeup`) isn't
+  cron-backed and isn't visible to these tools. Pausing a
+  dynamic-mode loop is "stop replying" — which happens automatically
+  when the user doesn't interact.
+- These skills don't try to deduplicate or validate cron logic.
+  They're a thin layer over `CronCreate` / `CronDelete` / `CronList`.
+
+## License
+
+MIT.
