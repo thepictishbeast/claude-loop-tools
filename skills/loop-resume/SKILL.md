@@ -47,21 +47,46 @@ clean one and tell the user before scheduling.
      entry), `recurring` (from entry, default true).
    - Capture the new job ID.
 
-6. **Append history event** to `$HOME/.claude/loop-history.jsonl`:
+5a. **In-flight tasks replay** (added 2026-05-17): if the saved
+    entry has an `inflight_tasks` array (set by /loop-pause when
+    tasks were mid-flight at pause time), surface them to the user:
+
+    ```
+    These tasks were in-flight at /loop-pause time:
+      #3 [in_progress] Refactor mailer pool
+
+    TaskList is session-scoped, so they aren't auto-recreated. Pick up
+    by re-creating them via TaskCreate if you want — or just remember
+    they're waiting.
+    ```
+
+    If running inside a session where TaskList is available AND the
+    `inflight_tasks` array has entries, ALSO offer to re-create them
+    automatically:
+
+    > Re-create these N tasks now? [y/N]
+
+    If yes, TaskCreate each. Note that IDs won't match — they're
+    fresh. The original IDs go into task metadata for audit.
+
+6. **Append history event** to `$HOME/.claude/loop-history.jsonl`
+   using flock on `~/.claude/loop-history.lock`:
    ```jsonl
-   {"event":"resumed","at":"...Z","id_original":"old","id_new":"new","cron":"...","interval_override":"5m or null"}
+   {"event":"resumed","at":"...Z","id_original":"old","id_new":"new","cron":"...","interval_override":"5m or null","inflight_tasks_replayed":3}
    ```
 
-7. **Delete** `$HOME/.claude/.paused-loops.json` (state consumed).
-   Idempotent — if any CronCreate failed, KEEP the failed entries in
-   the file instead and report which.
+7. **Delete** `$HOME/.claude/.paused-loops.json` (state consumed)
+   under flock on `~/.claude/.paused-loops.lock`. Idempotent — if
+   any CronCreate failed, KEEP the failed entries in the file
+   instead and report which.
 
 8. **Execute the prompt now** for each resumed loop, per /loop
    convention — don't wait for the first cron fire. If the prompt
    starts with `/`, invoke via Skill; else act on it as user input.
 
 9. **Confirm** in one short paragraph: how many resumed, new IDs,
-   cadence (note if overridden), that iter-1 is running now.
+   cadence (note if overridden), inflight task replay status, that
+   iter-1 is running now.
 
 ## Editing the JSON before /loop-resume
 

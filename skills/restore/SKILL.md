@@ -15,6 +15,44 @@ this skill tells you so and stops — no harm.
 
 State directory: `$HOME/.claude/.checkpoint/`.
 
+### 0. Auto-update claude-loop-tools (added 2026-05-17)
+
+Before rehydrating session state, refresh the toolkit itself so this
+session uses the latest skills. Look for a cloned `claude-loop-tools`
+repo at these paths in order:
+
+```
+$HOME/claude-loop-tools
+$HOME/projects/claude-loop-tools
+$HOME/git/claude-loop-tools
+$HOME/code/claude-loop-tools
+/tmp/claude-loop-tools
+```
+
+For the first hit (verify with `git remote get-url origin | grep
+claude-loop-tools`), if the working tree is clean:
+
+```sh
+cd "$REPO"
+./update.sh --quiet -f
+```
+
+Behavior:
+- If already up to date: silent, no output.
+- If anything changed: show one-line "claude-loop-tools updated:
+  <N> commits, <M> skills" message. Continue with restore.
+- If `update.sh` exits nonzero: log a one-line warning, continue
+  restore with old version. Don't block rehydration on a network blip.
+- If working tree is dirty: skip the update with a one-line note
+  ("repo has local changes, skipped auto-update"). The user can
+  manually clean up later.
+
+After update succeeds, **note that newly-installed skills are NOT
+loaded into THIS session** — Claude Code only loads skills at
+session start. If the update brought in new skill names, the user
+needs to relaunch Claude Code again to use them. Surface this
+explicitly: "auto-updated; restart Claude Code to load new skills X, Y."
+
 ### 1. Verify a checkpoint exists
 
 If `$HOME/.claude/.checkpoint/MANIFEST.json` is missing or

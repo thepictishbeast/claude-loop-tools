@@ -6,15 +6,16 @@ Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
 
 Claude Code ships with `/loop` but no way to pause a long-running
 loop without losing it, change its interval without re-typing the
-prompt, or audit what's been scheduled over time. This adds five
-skills:
+prompt, audit what's been scheduled over time, or compose loops with
+TaskList / Monitor. This adds twelve skills:
 
 - **`/loop-pause`** — pause all active cron jobs. State is written to
   `~/.claude/.paused-loops.json` and the cron entries deleted.
-  Nothing is lost.
+  Warns if `TaskList` shows in-flight tasks. Nothing is lost.
 - **`/loop-resume`** — restore the paused jobs. Optional arg changes the
-  interval inline (`/loop-resume 5m`). Edit the JSON between pause and
-  resume to change the prompt, cron, or any other field.
+  interval inline (`/loop-resume 5m`). Replays `inflight_tasks`
+  recorded at pause time. Edit the JSON between pause and resume to
+  change the prompt, cron, or any other field.
 - **`/loop-edit`** — change the interval, prompt, or both of an
   **already-running** loop without going through pause+resume.
   Forms: `/loop-edit 5m`, `/loop-edit prompt: "new text"`,
@@ -23,14 +24,32 @@ skills:
   clears any paused state. Distinct from `/loop-pause` (which is
   resumable). Use for "I'm done with this loop, clean up."
 - **`/loops`** — show a unified view of active + paused + recent
-  history (last 20 events).
+  history (last 20 events). Auto-discovers untracked crons (raw
+  `/loop` invocations not yet in history) as a side effect.
+- **`/loop-track`** — explicitly register an existing cron job into
+  the history with a label. Useful when `/loops` auto-discovery
+  couldn't capture the full prompt.
+- **`/loop-update`** — pull the latest claude-loop-tools from GitHub
+  and re-install. Detects stale renamed skills. (`/restore` also runs
+  this auto on session start.)
+- **`/loop-from-task`** — wrap a TaskList task as a self-terminating
+  loop. Fires periodically, works on the task, `/loop-stop`s itself
+  when the task is marked completed.
+- **`/loop-on`** — event-driven loop using `Monitor` instead of cron.
+  Watches conditions (`pr-merged:`, `ci-status:`, `task-completed:`,
+  `port-open:`, custom `watch-cmd:`); fires the `then:` prompt when
+  the condition triggers.
+- **`/loop-health`** — single-shot lint diagnostic. Reports missing
+  canaries, oversized prompts, stale paused entries, untracked crons,
+  history-rotation candidates, stale skill-rename leftovers.
 - **`/checkpoint`** — save FULL session state (tasks + active loops
   + background processes + dirty git trees + handoff note) to
   `~/.claude/.checkpoint/`. Use before you `/exit` so you can pick up
   exactly where you left off.
-- **`/restore`** — first command of a new session. Reads the
-  `~/.claude/.checkpoint/` state, re-creates the TaskList, resumes
-  paused loops, shows the handoff note, then deletes the checkpoint.
+- **`/restore`** — first command of a new session. Auto-updates the
+  toolkit from upstream, then reads the `~/.claude/.checkpoint/`
+  state, re-creates the TaskList, resumes paused loops, shows the
+  handoff note, then deletes the checkpoint.
 
 History is appended to `~/.claude/loop-history.jsonl` on every
 pause/resume/edit/stop — append-only, one JSON line per event.
