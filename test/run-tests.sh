@@ -181,5 +181,64 @@ fi
 
 # ----------------------------------------------------------------------
 echo ""
+echo "[7] example files validate"
+
+if [ -d examples ]; then
+    # paused-loops.example.json must be valid JSON and an array
+    if [ -f examples/paused-loops.example.json ]; then
+        if python3 -c "
+import json, sys
+d = json.load(open('examples/paused-loops.example.json'))
+assert isinstance(d, list), 'top level must be array'
+for entry in d:
+    for field in ('cron','prompt','recurring'):
+        assert field in entry, f'entry missing {field}'
+" 2>/dev/null; then
+            pass "examples/paused-loops.example.json: valid JSON with required fields"
+        else
+            fail "examples/paused-loops.example.json: invalid or missing required fields"
+        fi
+    else
+        fail "examples/paused-loops.example.json: file missing"
+    fi
+
+    # loop-history.example.jsonl must be one valid JSON object per line
+    if [ -f examples/loop-history.example.jsonl ]; then
+        if python3 -c "
+import json
+with open('examples/loop-history.example.jsonl') as f:
+    for i, line in enumerate(f, 1):
+        line = line.strip()
+        if not line:
+            continue
+        d = json.loads(line)
+        assert 'event' in d, f'line {i} missing event field'
+        assert 'at' in d, f'line {i} missing at field'
+" 2>/dev/null; then
+            pass "examples/loop-history.example.jsonl: valid JSONL with required fields"
+        else
+            fail "examples/loop-history.example.jsonl: invalid or missing required fields"
+        fi
+    else
+        fail "examples/loop-history.example.jsonl: file missing"
+    fi
+
+    # examples/README.md must explain both files
+    if [ -f examples/README.md ]; then
+        if grep -qF "paused-loops.example.json" examples/README.md && \
+           grep -qF "loop-history.example.jsonl" examples/README.md; then
+            pass "examples/README.md: documents both example files"
+        else
+            fail "examples/README.md: doesn't reference both example files"
+        fi
+    else
+        fail "examples/README.md: file missing"
+    fi
+else
+    fail "examples/ directory missing"
+fi
+
+# ----------------------------------------------------------------------
+echo ""
 echo "summary: $PASS pass, $FAIL fail"
 [ "$FAIL" -eq 0 ]
