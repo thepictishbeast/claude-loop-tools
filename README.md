@@ -35,6 +35,29 @@ skills:
 History is appended to `~/.claude/loop-history.jsonl` on every
 pause/resume/edit/stop — append-only, one JSON line per event.
 
+## Patterns (general-purpose loop design)
+
+See [`docs/LOOP_PATTERNS.md`](./docs/LOOP_PATTERNS.md) for the
+catalogue covering:
+
+- **Stop conditions** — empty task list / max iterations / error
+  budget exhausted / deadline / success condition met / drift
+  detection / external signal / composed-with-OR semantics.
+- **Interval strategies** — fixed cron / dynamic mode (no
+  interval token, self-paced via `ScheduleWakeup`) / adaptive
+  cron (agent retunes its own cadence via `/loop-edit` based on
+  observed state) / exponential backoff on idle / time-windowed
+  (work-hours fast, night slow).
+- **General-purpose loop design checklist + prompt template** —
+  every decision (cadence shape / interval / stop conditions /
+  scope / reporting / recovery) explicit before scheduling.
+
+This toolkit deliberately keeps the skills low-level (`/loop`
+schedules, `/loop-edit` retunes, `/loop-stop` cancels). The
+PATTERNS doc shows how to compose them into loops that fit
+arbitrary work shapes — bursty / steady / decreasing /
+event-driven — without retyping verbose prompts.
+
 ## Install
 
 ```sh

@@ -1,0 +1,349 @@
+# Loop patterns — stop conditions, adaptive cadence, general-purpose loop design
+
+A reference catalogue of reusable patterns for the loops `/loop`
++ this toolkit produce. Covers **stop conditions** (when to end
+a loop automatically) and **interval strategies** (fixed,
+dynamic, adaptive). Use this to compose loops that fit your work
+shape rather than retyping a verbose prompt every time.
+
+The toolkit is intentionally low-level — `/loop` creates cron
+entries, `/loop-*` skills manage their lifecycle. The PATTERNS
+on top of these primitives are what turn a cron job into a
+*useful* loop. This doc enumerates the patterns; the skills are
+unchanged.
+
+---
+
+## Part 1 — Stop conditions
+
+Cron jobs in this toolkit auto-expire after 7 days. Until then
+they fire forever unless told to stop. Three ways to stop:
+
+1. **Manual** — `/loop-stop <id>` or `/loop-stop all`.
+2. **Self-cancel from inside the loop** — the agent decides to
+   stop and calls `CronDelete <this-job-id>` mid-iteration.
+3. **External trigger** — a separate process detects the stop
+   condition and runs `/loop-stop` for you.
+
+**Self-cancel is the right answer most of the time.** The loop
+prompt embeds the stop condition; the agent runs the check on
+every fire; when the condition fires, the agent cancels itself.
+
+Stop-condition patterns:
+
+### 1.1 Empty task list
+
+> "Stop when there's no work left."
+
+```
+SELF-CHECK FIRST: TaskList. If zero pending AND zero in_progress,
+email me a status report at <addr> then CronDelete <this-id>.
+```
+
+The agent calls TaskList every fire; when it's empty, the loop
+ends. Most natural fit for "do all the things on my list and
+then stop."
+
+### 1.2 Max iterations cap
+
+> "Stop after N iterations even if there's more work."
+
+```
+SELF-CHECK FIRST: read ~/.claude/loop-iters.txt (default 0).
+Increment. Write back. If > 100, CronDelete <this-id> + report.
+```
+
+Useful as a safety net — caps runaway loops at a documented
+ceiling. Pair with another stop condition; don't rely on this
+alone as the primary stop.
+
+### 1.3 Error budget exhausted
+
+> "Stop after the build fails N times in a row."
+
+```
+SELF-CHECK FIRST: read ~/.claude/loop-failures.txt (default 0).
+If last build/CI run failed → increment + write. If passed →
+reset to 0. If counter > 5, CronDelete <this-id> + email me the
+last failure log.
+```
+
+Mirrors error-budget SLO discipline at the loop layer. Three
+consecutive red CI runs probably means something is structurally
+broken and you want the loop to STOP making it worse, not keep
+trying the same thing.
+
+### 1.4 Deadline / time budget
+
+> "Stop at midnight Friday" or "stop after running for 8 hours."
+
+```
+SELF-CHECK FIRST: read ~/.claude/loop-started.txt (write on iter
+1). If now - started > 8h, CronDelete <this-id>. If now > <ISO
+deadline>, CronDelete <this-id>.
+```
+
+Useful for compute-budget caps + "I want this done before the
+weekend" deadlines. The bundled `/schedule` skill is the better
+fit for time-pinned recurring work — this pattern is for
+"budget runs out X hours from now."
+
+### 1.5 Success condition met
+
+> "Stop when the test suite is green AND the docs site rebuilds
+> cleanly AND CI is fully green."
+
+```
+SELF-CHECK FIRST: run the success check (composite bash
+command). If exit 0, CronDelete <this-id> + email success
+report. If exit non-zero, continue iteration.
+```
+
+Useful for "drive until done" loops where you have a clear
+binary success condition. The agent runs the check every fire;
+when it passes, you're done.
+
+### 1.6 Drift / soft success
+
+> "Stop when nothing has changed for N iterations."
+
+```
+SELF-CHECK FIRST: hash the working state (`git rev-parse HEAD`
+of relevant repos + count of pending TaskList items). Compare to
+last fire's hash in ~/.claude/loop-state-hash.txt. If unchanged
+for 5 consecutive fires, CronDelete <this-id>.
+```
+
+Use when the loop is supposed to drive change and the absence
+of change means it's stuck or done. "Nothing changed in 5
+ticks" usually means either everything's done or the work is
+blocked — either way, useful to stop.
+
+### 1.7 External signal
+
+> "Stop when this file exists" or "stop when this URL returns 200."
+
+```
+SELF-CHECK FIRST: if test -f /tmp/STOP-MY-LOOP; then CronDelete
+<this-id> + remove the file + exit. Otherwise continue.
+```
+
+Lets external systems trigger a stop without needing to find +
+delete the cron entry. Useful when the operator wants to stop
+the loop from outside the agent's session (CI run finished,
+external job kicked off, etc).
+
+### Combining stop conditions
+
+Most real loops want multiple stop conditions composed with
+**OR** semantics — any one fires, the loop ends:
+
+```
+SELF-CHECK FIRST (run every iteration before new work):
+- TaskList: if empty → stop
+- read ~/.claude/loop-failures.txt: if > 5 → stop + email
+- now > 2026-06-01T00:00:00Z deadline → stop
+- /tmp/STOP-MY-LOOP exists → stop + remove file
+```
+
+Document each composed condition explicitly in the prompt.
+"Implicit" stop conditions get forgotten and cause loops that
+should have stopped to keep running.
+
+---
+
+## Part 2 — Interval strategies
+
+Three architectures:
+
+### 2.1 Fixed cron
+
+> "Every N minutes/hours/days."
+
+The default `/loop` behavior. `/loop 5m <prompt>` schedules an
+entry that fires every 5 minutes. Pros: predictable, simple,
+external observers can see the cadence. Cons: doesn't adapt to
+work shape — bursts of activity get throttled, idle periods
+waste fires.
+
+Use when: the work shape is uniform OR you specifically want
+external predictability (status-page polling, periodic backup
+trigger, etc).
+
+### 2.2 Dynamic mode (`/loop` without interval token)
+
+> "I'll decide how long to wait between fires myself."
+
+`/loop <prompt>` (no interval) puts the bundled `/loop` skill in
+**dynamic mode**: the agent runs the prompt once, then calls
+`ScheduleWakeup` with a self-chosen delay. Next fire re-enters
+the skill, re-runs the prompt, re-schedules.
+
+Pros: agent adapts cadence to observed state. Run fast while
+there's work; back off while idle.
+
+Cons: agent has to decide the delay every fire, which is one
+more decision per iteration.
+
+Recommended delay-selection rules (from the bundled skill
+description):
+
+- **60s–270s** when actively polling external state that isn't
+  notify-tracked (CI run, deploy queue). Cache stays warm.
+- **1200s–1800s** (20-30 min) for genuine idle ticks. The
+  Anthropic prompt cache TTL is 5 minutes; sleeping past 300s
+  pays a cache miss. Don't pick 300s — pay the miss once for
+  many minutes of saved compute, or stay under 270s.
+- Don't pick round-number minutes if the user's request is
+  approximate. Off-:00-mark minimizes herd cost.
+
+Use when: work shape is bursty + you want efficiency over
+predictability.
+
+### 2.3 Adaptive cron (fixed cadence + agent self-reschedule)
+
+> "Start at 1 min; back off to 15 min after N idle iterations;
+> snap back to 1 min when work appears."
+
+A hybrid: cron-scheduled at a fast cadence, but the agent calls
+`/loop-edit Nm` from inside the loop to retune the cadence
+based on observed state.
+
+```
+SELF-CHECK FIRST:
+- TaskList. If empty → /loop-edit 30m (back off — nothing to do).
+- TaskList has work → /loop-edit 1m (catch up — full speed).
+- CI red → /loop-edit 5m (steady pace while diagnosing).
+```
+
+The agent doesn't need to know its own job ID — `/loop-edit`
+operates on the unique active loop (or asks for disambiguation
+if multiple).
+
+Pros: cron's predictability + dynamic-mode's adaptivity. State
+adapts the cadence; the cadence is always visible externally.
+
+Cons: more complex prompt; agent has to remember to call edit.
+
+Use when: long-running loops where work density varies a lot
+over the loop's lifetime (e.g. "build platform, then maintain
+it" — front-loaded with work, back-loaded with idle).
+
+### 2.4 Exponential backoff on idle
+
+> "Slow down monotonically the longer there's nothing to do."
+
+```
+SELF-CHECK FIRST:
+- TaskList. If empty AND last iter was idle → /loop-edit 2× current cadence.
+- Cap at e.g. 1h.
+- Reset to 1m when work appears.
+```
+
+Pattern from networking + retry logic, applied to loops. Idle
+fires get cheaper over time; once work appears, snap back to
+fast.
+
+Use when: the loop is mostly a watcher (rarely needs to act).
+Don't use when bursty fast response matters more than efficiency.
+
+### 2.5 Time-windowed cadence
+
+> "Fast during work hours, slow at night."
+
+```
+SELF-CHECK FIRST:
+- read current hour. If 9-17 local → /loop-edit 1m.
+- Otherwise → /loop-edit 30m.
+- Skip the edit if cadence already matches the target.
+```
+
+Useful when the agent is collaborating with a human who wants
+fast turnaround during their day but doesn't want logs piling
+up overnight.
+
+### Switching between strategies mid-flight
+
+`/loop-edit Nm` accepts any new cadence — switching from 1m to
+hourly is one command. `/loop-pause` + edit `~/.claude/.paused-
+loops.json` → `/loop-resume` for more complex transitions.
+
+The toolkit doesn't enforce a single strategy; pick the one
+that fits your work shape now, change it later when it
+doesn't.
+
+---
+
+## Part 3 — General-purpose loop design checklist
+
+Before scheduling a loop, decide each of the following
+explicitly:
+
+| Decision | Options |
+|---|---|
+| **Cadence shape** | Fixed cron / dynamic / adaptive / exponential / time-windowed |
+| **Initial interval** | 30s / 1m / 5m / 30m / 1h / etc |
+| **Stop conditions** | One or more from §1 |
+| **Stop action** | `CronDelete <this-id>` from inside the loop, plus optional email/notification |
+| **Self-check sequence** | What to verify before each iteration's work (task list, git state, CI health, fmt+tests, memory) |
+| **Scope** | Which repos / capabilities / file paths the loop is allowed to touch |
+| **Reporting** | When the loop sends mail / writes a log / pings a status page |
+| **Recovery** | What happens if the agent dies mid-iter (the cron fires again; durable state must absorb the gap) |
+
+A loop prompt with all of these specified explicitly tends to
+behave predictably across sessions. A loop prompt that elides
+any of them tends to drift or restart work it has already done.
+
+### Prompt template — fully-specified loop
+
+```
+LOOP <name> (every <interval> per <owner> <date>). Scope: <repo list>.
+
+SELF-CHECKS FIRST (run every iteration before new work):
+1. TaskList — any in_progress? Continue it.
+2. Git cleanliness — check each repo in scope.
+3. CI health — gh run list for each repo.
+4. fmt + tests on the recent repo.
+5. Memory — read new memory files.
+
+STOP CONDITIONS (any fires → end loop):
+- TaskList empty → CronDelete <this-id> + email <addr>.
+- Failures > 5 → CronDelete <this-id> + email failure log.
+- After 2026-06-01 → CronDelete <this-id>.
+
+EXECUTION DISCIPLINE:
+- One focused increment per iteration.
+- Standard commit / push / verify CI sequence.
+- Every commit carries docs + tests + audits inline.
+
+TASK PRIORITY:
+- <ordered list>
+
+End each iteration with a one-line status summary.
+```
+
+The bundled `/loop` skill + the `/loop-*` skills in this toolkit
+take care of scheduling + lifecycle; the **prompt** is where
+you express the policy. Treat the prompt as a small program;
+write it the way you'd write any other small program — with
+explicit pre-conditions, clear stop semantics, and named
+collaborators.
+
+---
+
+## See also
+
+- `CLAUDE.md` — agent-side instructions for participating in a
+  loop (what to do when a loop fire injects a prompt).
+- `skills/loop-pause/SKILL.md` + `loop-resume/`, `loop-edit/`,
+  `loop-stop/`, `loops/` — the individual skill specs.
+- `skills/checkpoint/` + `restore/` — session-scoped state
+  preservation across `/exit`s.
+- Anthropic's bundled `/loop` skill (in Claude Code itself) —
+  the primitive this toolkit extends.
+
+This doc is general-purpose: nothing in it is specific to any
+one project. If you find your loop prompt accumulating
+project-specific scaffolding, factor the scaffolding into a
+project-specific skill and keep the prompt itself describing
+*what* the loop does, not *how* the project's tooling works.
