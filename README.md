@@ -1,5 +1,7 @@
 # claude-loop-tools
 
+[![test](https://github.com/thepictishbeast/claude-loop-tools/actions/workflows/test.yml/badge.svg)](https://github.com/thepictishbeast/claude-loop-tools/actions/workflows/test.yml)
+
 Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
 
 Claude Code ships with `/loop` but no way to pause a long-running
