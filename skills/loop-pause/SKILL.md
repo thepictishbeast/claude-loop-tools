@@ -1,9 +1,9 @@
 ---
-name: pause
-description: Pause all active Claude Code cron jobs (typically /loop loops) and save their state to ~/.claude/.paused-loops.json so /resume can restore them. Use this when the user wants to stop scheduled work temporarily — state is preserved, no work is lost.
+name: loop-pause
+description: Pause all active Claude Code cron jobs (typically /loop loops) and save their state to ~/.claude/.paused-loops.json so /loop-resume can restore them. Use this when the user wants to stop scheduled work temporarily — state is preserved, no work is lost.
 ---
 
-# /pause — pause active cron jobs, preserve state for /resume
+# /loop-pause — pause active cron jobs, preserve state for /loop-resume
 
 When the user invokes this skill:
 
@@ -29,7 +29,7 @@ When the user invokes this skill:
      from another source — look for a session log (e.g.
      `~/doctrine/sessions/*-loop.md`), a resume file
      (`~/.claude/.last-loop-prompt`), or ASK the user. **Refuse to
-     pause with a truncated prompt** — it would corrupt /resume.
+     pause with a truncated prompt** — it would corrupt /loop-resume.
 
 5. **Auto-canary check** (paul's pattern): the prompt should contain a
    self-check sentence so the loop body detects "if I'm seeing this
@@ -79,14 +79,14 @@ When the user invokes this skill:
 
 10. **Confirm** in one short paragraph: how many jobs paused, where
     state was saved, whether a canary was added, how to resume:
-    `Type /resume to reactivate · Edit ~/.claude/.paused-loops.json first to change interval or prompt`.
+    `Type /loop-resume to reactivate · Edit ~/.claude/.paused-loops.json first to change interval or prompt`.
 
 ## Edge cases
 
 - Malformed prior state: rename to `.paused-loops.json.bak`, write
   fresh, tell user.
 - Non-loop cron jobs in the active list (manually CronCreate'd): pause
-  them too. /resume restores identically.
+  them too. /loop-resume restores identically.
 - File exists but is empty `[]`: treat as no prior pause.
 
 ## Don't do

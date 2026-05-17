@@ -1,6 +1,6 @@
 ---
 name: loops
-description: Show a unified view of Claude Code cron/loop state — currently active cron jobs, currently paused loops (from /pause), and recent loop history (last starts/pauses/resumes/stops). Use this to check what's running or recently ran.
+description: Show a unified view of Claude Code cron/loop state — currently active cron jobs, currently paused loops (from /loop-pause), and recent loop history (last starts/pauses/resumes/stops). Use this to check what's running or recently ran.
 ---
 
 # /loops — list active + paused + recent loop activity
@@ -31,7 +31,7 @@ When the user invokes this skill:
 
    Paused (N):
      · cron=<expr> · paused at <ISO>: <prompt first 60 chars>...
-     (run /resume to restore)
+     (run /loop-resume to restore)
 
    Inflight tasks (N):
      #1 [in_progress] <subject>
@@ -68,8 +68,8 @@ confirm). Don't touch active or paused state.
 ## Don't
 
 - Don't modify any state files. This skill is read-only.
-- Don't call CronCreate or CronDelete. Those are /resume's and
-  /pause's jobs.
+- Don't call CronCreate or CronDelete. Those are /loop-resume's and
+  /loop-pause's jobs.
 - Don't call TaskCreate / TaskUpdate / TaskStop — read only. The
   agent decides if a task needs creating; this skill just shows
   what's there.

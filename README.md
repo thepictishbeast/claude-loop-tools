@@ -6,20 +6,27 @@ Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
 
 Claude Code ships with `/loop` but no way to pause a long-running
 loop without losing it, change its interval without re-typing the
-prompt, or audit what's been scheduled over time. This adds three
+prompt, or audit what's been scheduled over time. This adds five
 skills:
 
-- **`/pause`** — pause all active cron jobs. State is written to
+- **`/loop-pause`** — pause all active cron jobs. State is written to
   `~/.claude/.paused-loops.json` and the cron entries deleted.
   Nothing is lost.
-- **`/resume`** — restore the paused jobs. Optional arg changes the
-  interval inline (`/resume 5m`). Edit the JSON between pause and
+- **`/loop-resume`** — restore the paused jobs. Optional arg changes the
+  interval inline (`/loop-resume 5m`). Edit the JSON between pause and
   resume to change the prompt, cron, or any other field.
+- **`/loop-edit`** — change the interval, prompt, or both of an
+  **already-running** loop without going through pause+resume.
+  Forms: `/loop-edit 5m`, `/loop-edit prompt: "new text"`,
+  `/loop-edit 5m prompt: "..."`, `/loop-edit prompt-append: "..."`.
+- **`/loop-stop`** — permanently cancel a loop. Deletes the cron AND
+  clears any paused state. Distinct from `/loop-pause` (which is
+  resumable). Use for "I'm done with this loop, clean up."
 - **`/loops`** — show a unified view of active + paused + recent
   history (last 20 events).
 
 History is appended to `~/.claude/loop-history.jsonl` on every
-pause/resume — append-only, one JSON line per event.
+pause/resume/edit/stop — append-only, one JSON line per event.
 
 ## Install
 
@@ -36,14 +43,24 @@ discovered.
 ## Usage
 
 ```
-/loop 1m do-some-recurring-task
-… you decide you want to stop temporarily …
-/pause                    # state saved, loop cancelled
-… come back later …
-/resume                   # restored exactly as paused
-/resume 5m                # restored, but new cadence is 5m
-/loops                    # see what's active/paused/recent
-/loops history            # see only the history log
+/loop 1m do-some-recurring-task         # start a loop
+…
+/loops                                  # what's active/paused/recent
+
+# Modify in place (no need for pause+resume cycle):
+/loop-edit 5m                           # change interval, keep prompt
+/loop-edit prompt: "new task text"      # change prompt, keep interval
+/loop-edit 5m prompt: "..."             # change both
+/loop-edit prompt-append: "and CC me"   # tack onto existing prompt
+
+# Pause/resume cycle (state preserved between):
+/loop-pause                             # state saved, loop cancelled
+/loop-resume                            # restore exactly as paused
+/loop-resume 5m                         # restore with new cadence
+$EDITOR ~/.claude/.paused-loops.json    # hand-edit anything before resume
+
+# Permanent stop:
+/loop-stop                              # delete cron + clear state
 ```
 
 ## Editing the prompt or cron of a paused loop
@@ -62,16 +79,16 @@ Each entry has:
 | `cadence_human` | human-readable cadence (informational only)          |
 | `recurring`     | boolean — does the cron auto-renew?                  |
 | `prompt`        | the verbatim message Claude receives each fire       |
-| `canary_added`  | whether `/pause` auto-added a canary line            |
+| `canary_added`  | whether `/loop-pause` auto-added a canary line            |
 | `paused_at`     | ISO-8601 UTC timestamp                               |
 | `label`         | optional short label (informational only)            |
 | `id_original`   | the original job ID from before pause (informational)|
 
-Save and `/resume` — the new values take effect.
+Save and `/loop-resume` — the new values take effect.
 
 ## The canary
 
-`/pause` auto-appends a self-check sentence to the prompt if one is
+`/loop-pause` auto-appends a self-check sentence to the prompt if one is
 not present:
 
 > Note: if you canceled or stopped this loop, you should NOT be
@@ -100,7 +117,7 @@ context. The skills `chmod 600` after writing.
 
 - Cron entries created with `CronCreate` are **session-scoped** —
   they die when the Claude Code session ends. The state file
-  persists, so `/resume` works even across sessions.
+  persists, so `/loop-resume` works even across sessions.
 - `/loop` dynamic mode (no interval, uses `ScheduleWakeup`) isn't
   cron-backed and isn't visible to these tools. Pausing a
   dynamic-mode loop is "stop replying" — which happens automatically

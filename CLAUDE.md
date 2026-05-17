@@ -92,13 +92,13 @@ When this happens:
 If the user wants to stop temporarily:
 
 ```
-/pause                              # pause all active cron jobs
+/loop-pause                              # pause all active cron jobs
                                     # state → ~/.claude/.paused-loops.json
                                     # cron entry deleted (session-scoped)
 ```
 
 State is preserved. The user can edit the JSON to change interval
-or prompt, then `/resume` (or `/resume 5m` to override interval).
+or prompt, then `/loop-resume` (or `/loop-resume 5m` to override interval).
 
 If the user wants to stop permanently: `CronDelete <id>` directly.
 Don't leave dangling cron jobs.

@@ -115,7 +115,7 @@ done
 echo ""
 echo "[5] state file path consistency"
 # Each SKILL.md must reference the standard state file path
-for f in skills/pause/SKILL.md skills/resume/SKILL.md skills/loops/SKILL.md; do
+for f in skills/loop-pause/SKILL.md skills/loop-resume/SKILL.md skills/loops/SKILL.md; do
     name="$(basename "$(dirname "$f")")"
     if grep -qF ".paused-loops.json" "$f"; then
         pass "$name: references .paused-loops.json"
@@ -129,42 +129,42 @@ echo ""
 echo "[6] feature documentation tests"
 
 # pause must document the history file
-if grep -qF "loop-history.jsonl" skills/pause/SKILL.md; then
+if grep -qF "loop-history.jsonl" skills/loop-pause/SKILL.md; then
     pass "pause: documents loop-history.jsonl"
 else
     fail "pause: missing loop-history.jsonl reference"
 fi
 
 # pause must document the canary auto-add
-if grep -qiE "canary|self.check" skills/pause/SKILL.md; then
+if grep -qiE "canary|self.check" skills/loop-pause/SKILL.md; then
     pass "pause: documents canary auto-add"
 else
     fail "pause: canary auto-add feature undocumented"
 fi
 
 # pause must refuse on truncated prompts (safety feature)
-if grep -qiE "truncated|refuse" skills/pause/SKILL.md; then
+if grep -qiE "truncated|refuse" skills/loop-pause/SKILL.md; then
     pass "pause: documents refuse-on-truncated-prompt safety"
 else
     fail "pause: missing truncated-prompt safeguard documentation"
 fi
 
 # resume must document the interval override feature
-if grep -qiE "resume 5m|interval.*override|/resume.*arg" skills/resume/SKILL.md; then
+if grep -qiE "loop-resume 5m|interval.*override|argument" skills/loop-resume/SKILL.md; then
     pass "resume: documents interval override"
 else
     fail "resume: interval override feature undocumented"
 fi
 
 # resume must document the cron-conversion table
-if grep -qE "^\| .*[Pp]attern.*\|.*[Cc]ron" skills/resume/SKILL.md; then
+if grep -qE "^\| .*[Pp]attern.*\|.*[Cc]ron" skills/loop-resume/SKILL.md; then
     pass "resume: documents interval→cron conversion table"
 else
     fail "resume: missing interval→cron conversion table"
 fi
 
 # resume must document the immediate-execute-now behavior (per /loop)
-if grep -qiE "execute.*now|don't wait.*first.*fire|first.*iter.*run.*now" skills/resume/SKILL.md; then
+if grep -qiE "execute.*now|don't wait.*first.*fire|first.*iter.*run.*now" skills/loop-resume/SKILL.md; then
     pass "resume: documents execute-now semantics"
 else
     fail "resume: execute-now semantics undocumented"
@@ -236,6 +236,55 @@ with open('examples/loop-history.example.jsonl') as f:
     fi
 else
     fail "examples/ directory missing"
+fi
+
+# ----------------------------------------------------------------------
+echo ""
+echo "[7b] loop-edit + loop-stop skills"
+
+for skill in loop-edit loop-stop; do
+    if [ -f "skills/$skill/SKILL.md" ]; then
+        pass "skill: $skill exists"
+    else
+        fail "skill: $skill missing"
+        continue
+    fi
+
+    # frontmatter name matches dir
+    declared="$(awk '/^---$/{c++; if(c==2)exit} c==1 && /^name: /{print $2; exit}' "skills/$skill/SKILL.md")"
+    if [ "$declared" = "$skill" ]; then
+        pass "skill: $skill frontmatter name matches dir"
+    else
+        fail "skill: $skill frontmatter name is '$declared' (want '$skill')"
+    fi
+done
+
+# loop-edit must document the interval-or-prompt distinction
+if grep -qiE "prompt:|prompt-append:" skills/loop-edit/SKILL.md; then
+    pass "loop-edit: documents prompt: / prompt-append: syntax"
+else
+    fail "loop-edit: missing prompt: / prompt-append: syntax"
+fi
+
+# loop-edit must NOT execute immediately (different from /loop-resume)
+if grep -qiE "Do NOT execute|not.*execute.*immediately" skills/loop-edit/SKILL.md; then
+    pass "loop-edit: documents no-immediate-execute semantics"
+else
+    fail "loop-edit: missing no-immediate-execute semantics"
+fi
+
+# loop-stop must distinguish itself from loop-pause
+if grep -qiE "pause.*resumable.*stop.*gone|stop.*permanently|pause.*temporarily" skills/loop-stop/SKILL.md; then
+    pass "loop-stop: distinguishes from loop-pause"
+else
+    fail "loop-stop: doesn't clearly distinguish from loop-pause"
+fi
+
+# loop-stop must mention history event 'stopped'
+if grep -qF '"event":"stopped"' skills/loop-stop/SKILL.md; then
+    pass "loop-stop: logs 'stopped' history event"
+else
+    fail "loop-stop: missing 'stopped' history event"
 fi
 
 # ----------------------------------------------------------------------

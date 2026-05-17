@@ -1,17 +1,17 @@
 ---
-name: resume
-description: Resume cron jobs that were previously paused with /pause. Reads ~/.claude/.paused-loops.json. Optionally takes a new interval argument (e.g. `/resume 5m`) to change cadence without manually editing the JSON. Edit the JSON between pause and resume to change the prompt or other fields.
+name: loop-resume
+description: Resume cron jobs that were previously paused with /loop-pause. Reads ~/.claude/.paused-loops.json. Optionally takes a new interval argument (e.g. `/loop-resume 5m`) to change cadence without manually editing the JSON. Edit the JSON between pause and resume to change the prompt or other fields.
 ---
 
-# /resume — restore paused cron jobs from on-disk state
+# /loop-resume — restore paused cron jobs from on-disk state
 
 ## Parse the argument
 
 The user may pass an optional interval to override the saved cadence:
-- `/resume` — restore each paused job with its original cron
-- `/resume 5m` / `/resume 1h` / `/resume Nd` — restore but change ALL
+- `/loop-resume` — restore each paused job with its original cron
+- `/loop-resume 5m` / `/loop-resume 1h` / `/loop-resume Nd` — restore but change ALL
   paused jobs to that interval
-- `/resume 30s` — rounds up to `1m` (cron min granularity); tell user
+- `/loop-resume 30s` — rounds up to `1m` (cron min granularity); tell user
 
 If the argument doesn't parse as an interval, ignore it and proceed
 with the saved cadences. Don't fail.
@@ -63,11 +63,11 @@ clean one and tell the user before scheduling.
 9. **Confirm** in one short paragraph: how many resumed, new IDs,
    cadence (note if overridden), that iter-1 is running now.
 
-## Editing the JSON before /resume
+## Editing the JSON before /loop-resume
 
 Tell users in the confirmation: "Hand-edit
 `$HOME/.claude/.paused-loops.json` between pause and resume to change
-the prompt, cron, or recurring flag. /resume reads whatever's there."
+the prompt, cron, or recurring flag. /loop-resume reads whatever's there."
 
 ## Edge cases
 
