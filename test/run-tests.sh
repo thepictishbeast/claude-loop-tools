@@ -126,5 +126,60 @@ done
 
 # ----------------------------------------------------------------------
 echo ""
+echo "[6] feature documentation tests"
+
+# pause must document the history file
+if grep -qF "loop-history.jsonl" skills/pause/SKILL.md; then
+    pass "pause: documents loop-history.jsonl"
+else
+    fail "pause: missing loop-history.jsonl reference"
+fi
+
+# pause must document the canary auto-add
+if grep -qiE "canary|self.check" skills/pause/SKILL.md; then
+    pass "pause: documents canary auto-add"
+else
+    fail "pause: canary auto-add feature undocumented"
+fi
+
+# pause must refuse on truncated prompts (safety feature)
+if grep -qiE "truncated|refuse" skills/pause/SKILL.md; then
+    pass "pause: documents refuse-on-truncated-prompt safety"
+else
+    fail "pause: missing truncated-prompt safeguard documentation"
+fi
+
+# resume must document the interval override feature
+if grep -qiE "resume 5m|interval.*override|/resume.*arg" skills/resume/SKILL.md; then
+    pass "resume: documents interval override"
+else
+    fail "resume: interval override feature undocumented"
+fi
+
+# resume must document the cron-conversion table
+if grep -qE "^\| .*[Pp]attern.*\|.*[Cc]ron" skills/resume/SKILL.md; then
+    pass "resume: documents interval→cron conversion table"
+else
+    fail "resume: missing interval→cron conversion table"
+fi
+
+# resume must document the immediate-execute-now behavior (per /loop)
+if grep -qiE "execute.*now|don't wait.*first.*fire|first.*iter.*run.*now" skills/resume/SKILL.md; then
+    pass "resume: documents execute-now semantics"
+else
+    fail "resume: execute-now semantics undocumented"
+fi
+
+# loops must document the three views (active + paused + history)
+if grep -qiE "active" skills/loops/SKILL.md && \
+   grep -qiE "paused" skills/loops/SKILL.md && \
+   grep -qiE "history" skills/loops/SKILL.md; then
+    pass "loops: documents all three views"
+else
+    fail "loops: missing one of {active, paused, history} view"
+fi
+
+# ----------------------------------------------------------------------
+echo ""
 echo "summary: $PASS pass, $FAIL fail"
 [ "$FAIL" -eq 0 ]
