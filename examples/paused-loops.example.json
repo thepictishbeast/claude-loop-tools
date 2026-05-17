@@ -1,0 +1,22 @@
+[
+  {
+    "id_original": "8dfaf6a4",
+    "cron": "*/1 * * * *",
+    "cadence_human": "Every minute (recurring)",
+    "recurring": true,
+    "prompt": "Watch the deploy at staging.example.com and post here when CI turns green. Note: if you canceled or stopped this loop, you should NOT be seeing this message.",
+    "canary_added": false,
+    "paused_at": "2026-05-17T05:40:00Z",
+    "label": "staging-deploy watch"
+  },
+  {
+    "id_original": "c2a91be0",
+    "cron": "*/30 * * * *",
+    "cadence_human": "Every 30 minutes (recurring)",
+    "recurring": true,
+    "prompt": "Check the lint score on the WIP branch and report any new violations. Note: if you canceled or stopped this loop, you should NOT be seeing this message.",
+    "canary_added": true,
+    "paused_at": "2026-05-17T05:40:00Z",
+    "label": "lint watch"
+  }
+]

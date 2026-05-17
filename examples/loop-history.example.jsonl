@@ -1,0 +1,5 @@
+{"event":"started","at":"2026-05-17T04:26:00Z","id_original":"8dfaf6a4","cron":"*/1 * * * *","label":"staging-deploy watch"}
+{"event":"paused","at":"2026-05-17T05:40:00Z","id_original":"8dfaf6a4","cron":"*/1 * * * *","label":"staging-deploy watch"}
+{"event":"resumed","at":"2026-05-17T05:55:00Z","id_original":"8dfaf6a4","id_new":"0c1d40a9","cron":"*/1 * * * *","interval_override":null,"label":"staging-deploy watch"}
+{"event":"started","at":"2026-05-17T06:00:00Z","id_original":"c2a91be0","cron":"*/30 * * * *","label":"lint watch"}
+{"event":"resumed","at":"2026-05-17T07:15:00Z","id_original":"c2a91be0","id_new":"f88a2110","cron":"*/5 * * * *","interval_override":"5m","label":"lint watch"}
