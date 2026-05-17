@@ -39,18 +39,20 @@ fi
 # Capture old HEAD for diff reporting
 OLD_HEAD="$(git rev-parse HEAD)"
 
-# Pull
-if ! git pull --ff-only 2>&1 | grep -v "^Already up to date\.$" > /tmp/.claude-loop-tools-pull.$$; then
-    cat /tmp/.claude-loop-tools-pull.$$
-    rm -f /tmp/.claude-loop-tools-pull.$$
-    echo >&2 "git pull failed"
+# Pull. Capture output + exit status separately so we can distinguish
+# "already up to date" (grep -v matches nothing → exit 1) from a real
+# git failure.
+PULL_OUT="$(git pull --ff-only 2>&1)"
+PULL_RC=$?
+if [ $PULL_RC -ne 0 ]; then
+    echo "$PULL_OUT"
+    echo >&2 "git pull failed (exit $PULL_RC)"
     exit 1
 fi
 
 NEW_HEAD="$(git rev-parse HEAD)"
 
 if [ "$OLD_HEAD" = "$NEW_HEAD" ]; then
-    rm -f /tmp/.claude-loop-tools-pull.$$
     [ "$QUIET" -eq 1 ] || echo "claude-loop-tools: already up to date ($NEW_HEAD)"
     exit 0
 fi
@@ -72,6 +74,5 @@ else
     ./install.sh
 fi
 
-rm -f /tmp/.claude-loop-tools-pull.$$
 echo
 echo "Done. New skills load on next Claude Code session."
