@@ -240,5 +240,50 @@ fi
 
 # ----------------------------------------------------------------------
 echo ""
+echo "[8] CLAUDE.md (loop hygiene doctrine)"
+
+if [ -f CLAUDE.md ]; then
+    pass "CLAUDE.md: file exists"
+else
+    fail "CLAUDE.md: missing (loop hygiene doctrine for AI agents)"
+fi
+
+# Must document the "don't restart on every fire" rule
+if grep -qiE "fire is a SIGNAL to continue|don't.*restart|finish.*current" CLAUDE.md 2>/dev/null; then
+    pass "CLAUDE.md: documents don't-restart-on-fire rule"
+else
+    fail "CLAUDE.md: missing the don't-restart-on-fire rule"
+fi
+
+# Must mention task list integration
+if grep -qiE "TaskList|TaskCreate|task list" CLAUDE.md 2>/dev/null; then
+    pass "CLAUDE.md: references task-list integration"
+else
+    fail "CLAUDE.md: missing task-list integration guidance"
+fi
+
+# Must explain tight-tick vs substantive
+if grep -qiE "tight.tick|steady.state|substantive" CLAUDE.md 2>/dev/null; then
+    pass "CLAUDE.md: distinguishes tight-tick vs substantive iters"
+else
+    fail "CLAUDE.md: missing tight-tick/substantive distinction"
+fi
+
+# README must point at CLAUDE.md
+if grep -qF "CLAUDE.md" README.md; then
+    pass "README: references CLAUDE.md"
+else
+    fail "README: missing CLAUDE.md reference"
+fi
+
+# loops SKILL.md must document the inflight-task view
+if grep -qiE "Inflight tasks|TaskList|task state" skills/loops/SKILL.md; then
+    pass "loops skill: documents inflight-task view"
+else
+    fail "loops skill: missing inflight-task view"
+fi
+
+# ----------------------------------------------------------------------
+echo ""
 echo "summary: $PASS pass, $FAIL fail"
 [ "$FAIL" -eq 0 ]

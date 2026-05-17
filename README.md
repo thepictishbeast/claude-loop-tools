@@ -108,6 +108,45 @@ context. The skills `chmod 600` after writing.
 - These skills don't try to deduplicate or validate cron logic.
   They're a thin layer over `CronCreate` / `CronDelete` / `CronList`.
 
+## Loop hygiene (for AI agents)
+
+When `/loop` fires every minute, the same prompt is re-injected each
+time. Without explicit hygiene, agents tend to:
+
+- Restart finished work every iteration
+- Drop mid-task work to "act on" the re-injected prompt
+- Lose track of what's in-flight vs. queued vs. done
+- Bloat the iteration log with duplicate state
+
+**[`CLAUDE.md`](./CLAUDE.md) is the contract every loop participant
+reads first.** Key rules it codifies:
+
+1. A loop fire is a SIGNAL to continue, not a command to start
+   something new. Finish in-flight work first.
+2. Maintain an explicit task list (`TaskCreate` / `TaskUpdate`).
+   The task list is the durable state that survives between fires;
+   the loop prompt itself doesn't carry state.
+3. Mid-iter user messages get acked + tracked as tasks, not allowed
+   to interrupt the current tool call.
+4. Tight-tick fires should produce a one-line health check and stop —
+   don't append redundant log entries for "still healthy".
+5. Substantive fires do work fully — don't fragment a 5-minute task
+   across 5 separate iterations.
+
+Recommended workflow:
+
+```
+/loop 5m work on the tasks in my TaskList; create new ones for
+follow-ups; log only when state changes
+```
+
+vs. the failure mode:
+
+```
+/loop 1m do everything you can       # too aggressive — every fire
+                                       # tries to start fresh work
+```
+
 ## License
 
 MIT.
