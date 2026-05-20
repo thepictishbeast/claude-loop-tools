@@ -61,7 +61,7 @@ For each:
 ### E. Auto-update freshness
 
 - **E1. Toolkit out of date** — if the locally-cloned
-  `claude-loop-tools` repo exists, check `git fetch --dry-run`
+  `claude-tools` repo exists, check `git fetch --dry-run`
   output for incoming commits. Report count.
 - **E2. Stale skill rename leftovers** — `~/.claude/skills/` contains
   a directory that's no longer in upstream's `skills/` (e.g. old
@@ -95,7 +95,7 @@ Run /loops to see current state. No mutations were made by this check.
    ~/.claude/skills/`, `ls ~/.claude/*.lock`.
 2. Run each check in order. Each is independent and read-only.
 3. If `TaskList` available, also include B4 inflight-task check.
-4. If a local clone of `claude-loop-tools` exists, `git fetch
+4. If a local clone of `claude-tools` exists, `git fetch
    --dry-run` for E1.
 5. Emit findings in the format above.
 6. Exit summary line: "Run X to fix Y, Z to fix W" guiding the user.

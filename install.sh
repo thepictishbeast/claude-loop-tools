@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install claude-loop-tools: builds the `claude-loop` Rust binary
+# Install claude-tools: builds the `claude-loop` Rust binary
 # AND copies the markdown skill specs into ~/.claude/skills/.
 #
 # Usage: ./install.sh [-f]

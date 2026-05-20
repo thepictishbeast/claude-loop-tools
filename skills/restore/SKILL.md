@@ -15,22 +15,22 @@ this skill tells you so and stops — no harm.
 
 State directory: `$HOME/.claude/.checkpoint/`.
 
-### 0. Auto-update claude-loop-tools (added 2026-05-17)
+### 0. Auto-update claude-tools (added 2026-05-17)
 
 Before rehydrating session state, refresh the toolkit itself so this
-session uses the latest skills. Look for a cloned `claude-loop-tools`
+session uses the latest skills. Look for a cloned `claude-tools`
 repo at these paths in order:
 
 ```
-$HOME/claude-loop-tools
-$HOME/projects/claude-loop-tools
-$HOME/git/claude-loop-tools
-$HOME/code/claude-loop-tools
-/tmp/claude-loop-tools
+$HOME/claude-tools
+$HOME/projects/claude-tools
+$HOME/git/claude-tools
+$HOME/code/claude-tools
+/tmp/claude-tools
 ```
 
 For the first hit (verify with `git remote get-url origin | grep
-claude-loop-tools`), if the working tree is clean:
+claude-tools`), if the working tree is clean:
 
 ```sh
 cd "$REPO"
@@ -39,7 +39,7 @@ cd "$REPO"
 
 Behavior:
 - If already up to date: silent, no output.
-- If anything changed: show one-line "claude-loop-tools updated:
+- If anything changed: show one-line "claude-tools updated:
   <N> commits, <M> skills" message. Continue with restore.
 - If `update.sh` exits nonzero: log a one-line warning, continue
   restore with old version. Don't block rehydration on a network blip.
@@ -122,7 +122,7 @@ Background processes that died on exit:
 - pid=12345 (cargo build) — you'd need to re-kick if still needed
 
 Dirty git trees (still uncommitted, paul-side decision):
-- /home/paul/projects/claude-loop-tools
+- /home/paul/projects/claude-tools
 
 Pick up where you left off.
 ```

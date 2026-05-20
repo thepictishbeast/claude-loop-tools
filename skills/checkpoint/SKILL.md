@@ -168,7 +168,7 @@ Captured:
 - 3 tasks (2 in_progress, 1 pending) → ~/.claude/.checkpoint/tasks.json
 - 1 active loop (security/forge, every minute) → paused via /loop-pause
 - 0 background processes
-- 1 dirty git tree (claude-loop-tools — uncommitted README.md edit)
+- 1 dirty git tree (claude-tools — uncommitted README.md edit)
 
 Safe to /exit and relaunch Claude Code now.
 

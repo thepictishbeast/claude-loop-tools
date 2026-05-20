@@ -1,5 +1,5 @@
 #!/bin/sh
-# claude-loop-tools update — git pull the repo + re-run install.sh
+# claude-tools update — git pull the repo + re-run install.sh
 #
 # Usage:
 #   ./update.sh           # interactive — prompts before overwrite
@@ -53,12 +53,12 @@ fi
 NEW_HEAD="$(git rev-parse HEAD)"
 
 if [ "$OLD_HEAD" = "$NEW_HEAD" ]; then
-    [ "$QUIET" -eq 1 ] || echo "claude-loop-tools: already up to date ($NEW_HEAD)"
+    [ "$QUIET" -eq 1 ] || echo "claude-tools: already up to date ($NEW_HEAD)"
     exit 0
 fi
 
 # Print what changed
-echo "claude-loop-tools updated: $OLD_HEAD → $NEW_HEAD"
+echo "claude-tools updated: $OLD_HEAD → $NEW_HEAD"
 echo
 echo "Commits since previous install:"
 git log --oneline "$OLD_HEAD".."$NEW_HEAD"

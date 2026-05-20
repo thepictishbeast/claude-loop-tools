@@ -1,6 +1,21 @@
-# claude-loop-tools
+# claude-tools
 
-[![test](https://github.com/thepictishbeast/claude-loop-tools/actions/workflows/test.yml/badge.svg)](https://github.com/thepictishbeast/claude-loop-tools/actions/workflows/test.yml)
+[![test](https://github.com/thepictishbeast/claude-tools/actions/workflows/test.yml/badge.svg)](https://github.com/thepictishbeast/claude-tools/actions/workflows/test.yml)
+
+> **RENAMED 2026-05-20**: this repo was `claude-loop-tools`. GitHub's
+> rename redirect keeps the old URL working for clones, but new
+> clones should use:
+> ```sh
+> git clone https://github.com/thepictishbeast/claude-tools
+> ```
+> Existing clones: `git remote set-url origin https://github.com/thepictishbeast/claude-tools.git`
+>
+> **Scope expanded**: this repo is now the **umbrella for all Claude
+> Code tooling** (skills, MCPs, helper binaries) — not just `/loop-*`.
+> Run `/loop-update` (or `update.sh` directly) regularly to pull
+> the latest set into `~/.claude/skills/`. See [CONTRIBUTING.md](
+> ./CONTRIBUTING.md) for the "add a new tool" workflow (Rust first,
+> token-efficient, automates a frequent task).
 
 Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
 
@@ -29,7 +44,7 @@ TaskList / Monitor. This adds twelve skills:
 - **`/loop-track`** — explicitly register an existing cron job into
   the history with a label. Useful when `/loops` auto-discovery
   couldn't capture the full prompt.
-- **`/loop-update`** — pull the latest claude-loop-tools from GitHub
+- **`/loop-update`** — pull the latest claude-tools from GitHub
   and re-install. Detects stale renamed skills. (`/restore` also runs
   this auto on session start.)
 - **`/loop-from-task`** — wrap a TaskList task as a self-terminating
@@ -115,8 +130,8 @@ event-driven — without retyping verbose prompts.
 ## Install
 
 ```sh
-git clone https://github.com/thepictishbeast/claude-loop-tools
-cd claude-loop-tools
+git clone https://github.com/thepictishbeast/claude-tools
+cd claude-tools
 mkdir -p ~/.claude/skills
 cp -r skills/* ~/.claude/skills/
 ```

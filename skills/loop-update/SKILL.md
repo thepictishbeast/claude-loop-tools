@@ -1,14 +1,14 @@
 ---
 name: loop-update
-description: Pull the latest claude-loop-tools from GitHub and re-install the skills. Use when the user says "update my loop tools", "upgrade claude-loop-tools", "pull latest loop tools", or "check for loop-tools updates". Runs `update.sh` from the cloned repo location. Tells the user what commits arrived since the last install.
+description: Pull the latest claude-tools from GitHub and re-install the skills. Use when the user says "update my loop tools", "upgrade claude-tools", "pull latest loop tools", or "check for loop-tools updates". Runs `update.sh` from the cloned repo location. Tells the user what commits arrived since the last install.
 ---
 
-# /loop-update — refresh claude-loop-tools from upstream
+# /loop-update — refresh claude-tools from upstream
 
 ## When to use this
 
 The user wants to pick up the latest skills from
-`github.com/thepictishbeast/claude-loop-tools` without doing the
+`github.com/thepictishbeast/claude-tools` without doing the
 clone/git-pull/install.sh dance manually.
 
 ## Steps
@@ -19,18 +19,18 @@ The repo lives wherever the user cloned it. Try these paths in order
 until one is a git repo with `origin` pointing at the right place:
 
 ```
-$HOME/claude-loop-tools
-$HOME/projects/claude-loop-tools
-$HOME/git/claude-loop-tools
-$HOME/code/claude-loop-tools
-/tmp/claude-loop-tools
+$HOME/claude-tools
+$HOME/projects/claude-tools
+$HOME/git/claude-tools
+$HOME/code/claude-tools
+/tmp/claude-tools
 ```
 
 For each candidate, verify with:
 
 ```sh
 cd "$candidate" 2>/dev/null
-git remote get-url origin 2>/dev/null | grep -q "claude-loop-tools" && echo HIT
+git remote get-url origin 2>/dev/null | grep -q "claude-tools" && echo HIT
 ```
 
 If none of those work, ASK the user where they cloned it. Don't
@@ -72,7 +72,7 @@ old-named directory may still exist in `~/.claude/skills/`. Detect:
 for d in $HOME/.claude/skills/*/; do
     name=$(basename "$d")
     if [ ! -d "$REPO/skills/$name" ]; then
-        # Only flag if it appears to be a claude-loop-tools skill
+        # Only flag if it appears to be a claude-tools skill
         # (skill names matching: loops, loop-*, checkpoint, restore, pause, resume)
         case "$name" in
             loops|loop-*|checkpoint|restore|pause|resume)

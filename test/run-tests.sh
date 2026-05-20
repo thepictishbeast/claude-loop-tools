@@ -418,7 +418,7 @@ else
     fail "loops: missing auto-discovery step"
 fi
 
-if grep -q "Auto-update claude-loop-tools" skills/restore/SKILL.md; then
+if grep -q "Auto-update claude-tools" skills/restore/SKILL.md; then
     pass "restore: auto-update step documented"
 else
     fail "restore: missing auto-update step"
