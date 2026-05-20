@@ -454,6 +454,51 @@ else
     fail "CLAUDE.md: missing save-state rule"
 fi
 
+# ----------------------------------------------------------------------
+echo ""
+echo "[10] claude-loop history --filter end-to-end"
+
+if command -v claude-loop >/dev/null 2>&1; then
+    TMP_HOME="$(mktemp -d)"
+    cat > "$TMP_HOME/loop-history.jsonl" <<EOF
+{"event":"started","id_original":"a1","cron":"*/5 * * * *"}
+{"event":"paused","id_original":"a1","cron":"*/5 * * * *"}
+{"event":"stopped","id_original":"a1","cron":"*/5 * * * *"}
+{"event":"started","id_original":"b2","cron":"*/1 * * * *"}
+{"event":"paused","id_original":"b2","cron":"*/1 * * * *"}
+EOF
+    cnt_all=$(claude-loop --state-dir "$TMP_HOME" history 2>/dev/null | wc -l)
+    cnt_stopped=$(claude-loop --state-dir "$TMP_HOME" history --filter event=stopped 2>/dev/null | wc -l)
+    cnt_paused=$(claude-loop --state-dir "$TMP_HOME" history --filter event=paused 2>/dev/null | wc -l)
+    cnt_b2=$(claude-loop --state-dir "$TMP_HOME" history --filter id_original=b2 2>/dev/null | wc -l)
+    cnt_and=$(claude-loop --state-dir "$TMP_HOME" history --filter event=paused --filter id_original=b2 2>/dev/null | wc -l)
+    rm -rf "$TMP_HOME"
+
+    if [ "$cnt_all" = "5" ]; then pass "history: unfiltered returns all 5 lines"
+    else fail "history unfiltered: got $cnt_all (want 5)"; fi
+    if [ "$cnt_stopped" = "1" ]; then pass "history --filter event=stopped: 1 match"
+    else fail "history --filter event=stopped: got $cnt_stopped (want 1)"; fi
+    if [ "$cnt_paused" = "2" ]; then pass "history --filter event=paused: 2 matches"
+    else fail "history --filter event=paused: got $cnt_paused (want 2)"; fi
+    if [ "$cnt_b2" = "2" ]; then pass "history --filter id_original=b2: 2 matches"
+    else fail "history --filter id_original=b2: got $cnt_b2 (want 2)"; fi
+    if [ "$cnt_and" = "1" ]; then pass "history --filter (AND): 1 match"
+    else fail "history --filter (AND): got $cnt_and (want 1)"; fi
+else
+    echo "  skip: claude-loop not in PATH (run cargo install first)"
+fi
+
+if grep -qE "history --filter" skills/loops/SKILL.md; then
+    pass "loops/SKILL.md: --filter documented"
+else
+    fail "loops/SKILL.md: missing --filter documentation"
+fi
+if grep -qE "history --filter" README.md; then
+    pass "README.md: history --filter documented"
+else
+    fail "README.md: missing history --filter documentation"
+fi
+
 echo ""
 echo "summary: $PASS pass, $FAIL fail"
 [ "$FAIL" -eq 0 ]

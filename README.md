@@ -166,6 +166,13 @@ $EDITOR ~/.claude/.paused-loops.json    # hand-edit anything before resume
 # Permanent stop:
 /loop-stop                              # delete cron + clear state
 
+# Audit history with filters:
+claude-loop history                                 # last 20 events (all)
+claude-loop history -n 100                          # last 100 events
+claude-loop history --filter event=stopped          # only stopped events
+claude-loop history --filter event=paused --filter recurring=true
+                                                    # AND-narrow multi-key
+
 # Full session restart (paul wants to relaunch Claude Code):
 /checkpoint                             # save tasks, loops, bg procs, notes
 # then /exit + relaunch Claude Code (use --continue for chat history)

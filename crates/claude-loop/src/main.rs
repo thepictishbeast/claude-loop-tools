@@ -67,7 +67,30 @@ enum Cmd {
         /// Number of recent lines (default 20).
         #[arg(short = 'n', long, default_value_t = 20)]
         lines: usize,
+
+        /// Restrict to lines whose `event` field equals this value
+        /// (e.g. `--filter event=stopped`). Repeatable: each --filter
+        /// AND-narrows the result. Lines that fail to parse as JSON
+        /// are skipped silently when any filter is provided.
+        #[arg(long, value_parser = parse_filter)]
+        filter: Vec<(String, String)>,
     },
+}
+
+/// Parse `--filter key=value` into `(key, value)`. Refused `key=`,
+/// refused `=value`, refused bare `key`. Value may contain `=`
+/// (only the first `=` is the separator).
+fn parse_filter(s: &str) -> Result<(String, String), String> {
+    let Some((k, v)) = s.split_once('=') else {
+        return Err(format!("filter expected key=value, got `{s}`"));
+    };
+    if k.is_empty() {
+        return Err(format!("filter key empty in `{s}`"));
+    }
+    if v.is_empty() {
+        return Err(format!("filter value empty in `{s}`"));
+    }
+    Ok((k.to_string(), v.to_string()))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -333,19 +356,67 @@ fn cmd_list(dir: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-fn cmd_history(dir: &std::path::Path, lines: usize) -> Result<()> {
+fn cmd_history(
+    dir: &std::path::Path,
+    lines: usize,
+    filters: &[(String, String)],
+) -> Result<()> {
     let hp = history_path(dir);
     if !hp.exists() {
         println!("[]");
         return Ok(());
     }
     let raw = fs::read_to_string(&hp)?;
-    let mut tail: Vec<&str> = raw.lines().rev().take(lines).collect();
+    let filtered: Vec<&str> = if filters.is_empty() {
+        raw.lines().rev().take(lines).collect()
+    } else {
+        // When filters are present we must read the whole file (the
+        // last N matching lines are not necessarily in the last N raw
+        // lines). The history file caps via the maintainer's external
+        // rotation, so this is bounded in practice — still O(file) so
+        // worth flagging if it grows large.
+        raw.lines()
+            .rev()
+            .filter(|l| line_matches_filters(l, filters))
+            .take(lines)
+            .collect()
+    };
+    let mut tail = filtered;
     tail.reverse();
     for line in tail {
         println!("{}", line);
     }
     Ok(())
+}
+
+/// True iff the JSON object on `line` has every (key, value) in
+/// `filters` matching (string-equal on the JSON-encoded value's
+/// string form). Lines that don't parse as JSON object are skipped
+/// (returns false). Empty filter list means "everything matches"
+/// but the caller short-circuits this case for perf.
+fn line_matches_filters(line: &str, filters: &[(String, String)]) -> bool {
+    let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(line)
+    else {
+        return false;
+    };
+    filters.iter().all(|(k, v)| {
+        let actual = map.get(k);
+        match actual {
+            Some(serde_json::Value::String(s)) => s == v,
+            // Numeric / boolean / nested fields don't have a borrow-able
+            // string view so we serialize them to compare. The cmp_owned
+            // lint flags this allocation but the filter pathway is bounded
+            // by file size and the data shapes we accept here are all
+            // small primitives — readability wins.
+            #[allow(clippy::cmp_owned)]
+            Some(serde_json::Value::Number(n)) => n.to_string() == *v,
+            #[allow(clippy::cmp_owned)]
+            Some(serde_json::Value::Bool(b)) => b.to_string() == *v,
+            #[allow(clippy::cmp_owned)]
+            Some(other) => other.to_string() == *v,
+            None => false,
+        }
+    })
 }
 
 /// Detect the auto-canary line that /loop-pause adds. Same regexes
@@ -402,7 +473,7 @@ fn main() -> Result<()> {
         Cmd::Pause { label } => cmd_pause(&dir, label),
         Cmd::Resume { interval } => cmd_resume(&dir, interval),
         Cmd::List => cmd_list(&dir),
-        Cmd::History { lines } => cmd_history(&dir, lines),
+        Cmd::History { lines, filter } => cmd_history(&dir, lines, &filter),
     }
 }
 
@@ -448,5 +519,87 @@ mod tests {
     #[test]
     fn infer_label_first_sentence() {
         assert_eq!(infer_label("First. Second."), "First");
+    }
+
+    #[test]
+    fn parse_filter_rejects_missing_eq() {
+        assert!(parse_filter("event").is_err());
+    }
+    #[test]
+    fn parse_filter_rejects_empty_key() {
+        assert!(parse_filter("=stopped").is_err());
+    }
+    #[test]
+    fn parse_filter_rejects_empty_value() {
+        assert!(parse_filter("event=").is_err());
+    }
+    #[test]
+    fn parse_filter_accepts_value_with_equals() {
+        // Only the FIRST = separates; everything after is value.
+        assert_eq!(
+            parse_filter("k=a=b").unwrap(),
+            ("k".to_string(), "a=b".to_string())
+        );
+    }
+    #[test]
+    fn parse_filter_accepts_event_stopped() {
+        assert_eq!(
+            parse_filter("event=stopped").unwrap(),
+            ("event".to_string(), "stopped".to_string())
+        );
+    }
+
+    #[test]
+    fn filter_matches_string_event() {
+        let line = r#"{"event":"stopped","id":"abc"}"#;
+        let f = vec![("event".to_string(), "stopped".to_string())];
+        assert!(line_matches_filters(line, &f));
+    }
+    #[test]
+    fn filter_rejects_different_value() {
+        let line = r#"{"event":"started","id":"abc"}"#;
+        let f = vec![("event".to_string(), "stopped".to_string())];
+        assert!(!line_matches_filters(line, &f));
+    }
+    #[test]
+    fn filter_rejects_missing_key() {
+        let line = r#"{"id":"abc"}"#;
+        let f = vec![("event".to_string(), "stopped".to_string())];
+        assert!(!line_matches_filters(line, &f));
+    }
+    #[test]
+    fn filter_skips_nonjson_line() {
+        // Non-JSON history line should NOT match any filter — fail
+        // closed rather than panicking.
+        let f = vec![("event".to_string(), "x".to_string())];
+        assert!(!line_matches_filters("not-json", &f));
+    }
+    #[test]
+    fn filter_ands_multiple_keys() {
+        let line = r#"{"event":"stopped","id":"abc"}"#;
+        let f = vec![
+            ("event".to_string(), "stopped".to_string()),
+            ("id".to_string(), "abc".to_string()),
+        ];
+        assert!(line_matches_filters(line, &f));
+        // One mismatch fails the AND.
+        let f2 = vec![
+            ("event".to_string(), "stopped".to_string()),
+            ("id".to_string(), "other".to_string()),
+        ];
+        assert!(!line_matches_filters(line, &f2));
+    }
+    #[test]
+    fn filter_matches_numeric_field() {
+        // Numbers coerce to string-form for comparison.
+        let line = r#"{"event":"fired","duration_ms":150}"#;
+        let f = vec![("duration_ms".to_string(), "150".to_string())];
+        assert!(line_matches_filters(line, &f));
+    }
+    #[test]
+    fn filter_matches_bool_field() {
+        let line = r#"{"event":"paused","recurring":true}"#;
+        let f = vec![("recurring".to_string(), "true".to_string())];
+        assert!(line_matches_filters(line, &f));
     }
 }
