@@ -1,0 +1,9 @@
+# Rust build artifacts
+target/
+crates/*/target/
+crates/*/Cargo.lock
+
+# OS / editor cruft
+.DS_Store
+*~
+*.swp

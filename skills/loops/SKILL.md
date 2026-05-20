@@ -5,93 +5,61 @@ description: Show a unified view of Claude Code cron/loop state — currently ac
 
 # /loops — list active + paused + recent loop activity
 
-When the user invokes this skill:
+Thin wrapper around `claude-loop list`. Binary owns file reads +
+JSON shaping. Agent does the CronList API call.
 
 ## Steps
 
-1. **Active jobs** — call `CronList`. Capture all entries.
+1. **Active jobs** — call `CronList`, render the output.
 
-2. **Paused state** — read `$HOME/.claude/.paused-loops.json`. If
-   missing or `[]`, paused list is empty.
+2. **Paused + recent history** — invoke the binary:
 
-3. **History** — read last 20 lines (or fewer) from
-   `$HOME/.claude/loop-history.jsonl`. If missing, history is empty.
-
-4. **Untracked-cron discovery** (added 2026-05-17): for each active
-   cron from step 1, check whether the history has any
-   `created` / `resumed` / `discovered` / `paused` event with a
-   matching `id` (current or `id_new`/`id_original` from earlier
-   pause-resume cycles). If a cron has NO history entry, it was
-   created outside this toolkit (raw `/loop`, prior session,
-   inherited). Append a `discovered` event to the history file:
-
-   ```jsonl
-   {"event":"discovered","at":"<ISO-8601>","id":"<cron-id>","cron":"<expr>","cadence_human":"<human>","prompt":"<full prompt from CronList>","reason":"side-effect of /loops auto-discovery"}
+   ```sh
+   claude-loop list
    ```
 
-   This is the ONE state mutation this skill is allowed (see "Don't"
-   below — read-only EXCEPT for discovery audit log). The mutation
-   makes future `/loops`, `/loop-pause`, and `/loop-edit` runs see
-   prior context. Skip the append if CronList prompt is truncated
-   to ~80 chars AND you cannot reconstruct full text — log a
-   `discovered-truncated` event instead, with a note for the user.
+   Stdout is JSON with `paused` (array of paused-job records) +
+   `history_tail` (last 20 lines of `loop-history.jsonl`).
 
-5. **Inflight tasks**: if `TaskList` is available
-   in this environment, call it and capture the current task state.
-   Loops without an attached task list tend to drift / restart work.
-   Showing the task list inline with loop status helps the agent
-   pick up exactly where it left off.
-
-5. **Display** in this format (or similar — use whatever's clean):
+3. **Render compactly**:
 
    ```
-   Active (N loops):
+   Active (N):
      <id> · <cadence_human> · <prompt first 60 chars>...
 
-   Paused (N):
+   Paused (M):
      · cron=<expr> · paused at <ISO>: <prompt first 60 chars>...
      (run /loop-resume to restore)
-
-   Inflight tasks (N):
-     #1 [in_progress] <subject>
-     #2 [pending] <subject> (blockedBy: #1)
-     #3 [completed] <subject>
 
    Recent history (latest first):
      <ISO>  <event>  <id>  <prompt first 40 chars>...
    ```
 
-6. **If no active, no paused, no history**: tell user "No loops
-   active, paused, or in history yet. Use /loop to schedule one."
+   If active + paused + history are ALL empty: "No loops active,
+   paused, or in history yet. Use /loop to schedule one."
 
-## Optional argument: `/loops history`
+## Optional argument: `/loops history [N]`
 
-If the user passes `history` as the argument, show the last 50 lines
-of `loop-history.jsonl` only (skip active + paused). Useful for
-auditing what's been happening over time.
+For just the history tail:
+
+```sh
+claude-loop history -n 50
+```
+
+Default N = 20.
 
 ## Optional argument: `/loops clear-history`
 
-Truncate `loop-history.jsonl` to empty (after asking the user to
-confirm). Don't touch active or paused state.
+Not wired into the binary (destructive ops kept out of the
+auto-callable path). Suggest `rm ~/.claude/loop-history.jsonl` if
+the user really wants to truncate.
 
-## Format notes
+## Net visible tool calls per /loops
 
-- Truncate long prompts to ~60 chars in the listing — full prompt
-  lives in the JSON state file or the cron entry.
-- Show ISO-8601 UTC timestamps (don't translate to local time —
-  history file uses UTC and consistency matters more than locale).
-- If the user has a preference set for local time, that's their tool
-  (or a downstream skill) to handle.
+**2** total: `CronList` + `Bash`(claude-loop list).
 
 ## Don't
 
-- Don't modify any state files. This skill is read-only EXCEPT for
-  the auto-discovery append described in step 4 — that is the single
-  intentional mutation (and it's append-only audit log, not
-  destructive).
-- Don't call CronCreate or CronDelete. Those are /loop-resume's and
-  /loop-pause's jobs.
-- Don't call TaskCreate / TaskUpdate / TaskStop — read only. The
-  agent decides if a task needs creating; this skill just shows
-  what's there.
+- Don't modify state files. This skill is strictly read-only.
+- Don't call CronCreate / CronDelete here — those belong to
+  /loop-resume / /loop-pause.

@@ -3,108 +3,67 @@ name: loop-resume
 description: Resume cron jobs that were previously paused with /loop-pause. Reads ~/.claude/.paused-loops.json. Optionally takes a new interval argument (e.g. `/loop-resume 5m`) to change cadence without manually editing the JSON. Edit the JSON between pause and resume to change the prompt or other fields.
 ---
 
-# /loop-resume — restore paused cron jobs from on-disk state
+# /loop-resume — restore paused cron jobs (Rust-binary backed)
 
-## Parse the argument
+Thin wrapper around `claude-loop resume`. Binary owns the state
+read + history append + state-file deletion. Agent does the
+CronCreate API calls + executes the first iteration of each
+resumed prompt.
 
-The user may pass an optional interval to override the saved cadence:
-- `/loop-resume` — restore each paused job with its original cron
-- `/loop-resume 5m` / `/loop-resume 1h` / `/loop-resume Nd` — restore but change ALL
-  paused jobs to that interval
-- `/loop-resume 30s` — rounds up to `1m` (cron min granularity); tell user
+## Argument
 
-If the argument doesn't parse as an interval, ignore it and proceed
-with the saved cadences. Don't fail.
-
-## Interval-to-cron conversion (same as /loop)
-
-| Pattern             | Cron               | Notes                          |
-|---------------------|--------------------|---------------------------------|
-| `Nm` where N ≤ 59 | `*/N * * * *`    | every N minutes                 |
-| `Nm` where N ≥ 60 | `0 */H * * *`    | round to hours (H = N/60)       |
-| `Nh` where N ≤ 23 | `0 */N * * *`    | every N hours                   |
-| `Nd`              | `0 0 */N * *`    | every N days, midnight UTC      |
-| `Ns`              | round up to 1m    | cron min granularity            |
-
-If the interval doesn't cleanly divide its unit, pick the nearest
-clean one and tell the user before scheduling.
+- `/loop-resume` — restore each job with its saved cron
+- `/loop-resume 5m` / `1h` / `Nd` — apply this interval to ALL
+  paused jobs (binary converts to cron internally)
+- `/loop-resume 30s` — rounds up to `1m` (cron min granularity)
+- If the arg doesn't parse, the binary exits non-zero with a
+  diagnostic. Don't fail silently.
 
 ## Steps
 
-1. **Resolve the state directory** — `$HOME/.claude/`.
+1. **Invoke the binary** (one Bash call covers state-read + history
+   append + state-file deletion):
 
-2. **Read** `$HOME/.claude/.paused-loops.json`.
-
-3. **Missing or empty `[]`**: tell user "No paused loops to resume."
-   Stop. Don't delete the file.
-
-4. **Malformed JSON**: tell user, show the path, don't try to repair.
-
-5. **For each entry**:
-   - Determine cron expression: use the arg-override if provided,
-     else the entry's `cron` field.
-   - Call `CronCreate` with `cron`, `prompt` (verbatim from the
-     entry), `recurring` (from entry, default true).
-   - Capture the new job ID.
-
-5a. **In-flight tasks replay** (added 2026-05-17): if the saved
-    entry has an `inflight_tasks` array (set by /loop-pause when
-    tasks were mid-flight at pause time), surface them to the user:
-
-    ```
-    These tasks were in-flight at /loop-pause time:
-      #3 [in_progress] Refactor mailer pool
-
-    TaskList is session-scoped, so they aren't auto-recreated. Pick up
-    by re-creating them via TaskCreate if you want — or just remember
-    they're waiting.
-    ```
-
-    If running inside a session where TaskList is available AND the
-    `inflight_tasks` array has entries, ALSO offer to re-create them
-    automatically:
-
-    > Re-create these N tasks now? [y/N]
-
-    If yes, TaskCreate each. Note that IDs won't match — they're
-    fresh. The original IDs go into task metadata for audit.
-
-6. **Append history event** to `$HOME/.claude/loop-history.jsonl`
-   using flock on `~/.claude/loop-history.lock`:
-   ```jsonl
-   {"event":"resumed","at":"...Z","id_original":"old","id_new":"new","cron":"...","interval_override":"5m or null","inflight_tasks_replayed":3}
+   ```sh
+   claude-loop resume [--interval 5m]
    ```
 
-7. **Delete** `$HOME/.claude/.paused-loops.json` (state consumed)
-   under flock on `~/.claude/.paused-loops.lock`. Idempotent — if
-   any CronCreate failed, KEEP the failed entries in the file
-   instead and report which.
+   Stdout is a JSON array. Each entry has fields:
+   `cron`, `prompt`, `recurring`, `label`, `id_original`,
+   `inflight_tasks` (possibly empty).
 
-8. **Execute the prompt now** for each resumed loop, per /loop
-   convention — don't wait for the first cron fire. If the prompt
-   starts with `/`, invoke via Skill; else act on it as user input.
+2. **If output is `[]`**: tell user "No paused loops to resume." Stop.
 
-9. **Confirm** in one short paragraph: how many resumed, new IDs,
-   cadence (note if overridden), inflight task replay status, that
-   iter-1 is running now.
+3. **For each entry in the JSON**: call `CronCreate` with `cron`,
+   `prompt`, `recurring` from the entry.
 
-## Editing the JSON before /loop-resume
+4. **If any entry has non-empty `inflight_tasks`**: surface them:
 
-Tell users in the confirmation: "Hand-edit
-`$HOME/.claude/.paused-loops.json` between pause and resume to change
-the prompt, cron, or recurring flag. /loop-resume reads whatever's there."
+   ```
+   These tasks were in-flight at /loop-pause time:
+     #77 [in_progress] GOAL: Improve LFI ...
+     #85 [in_progress] v54 Tier-1 adoption: wire pulp ...
 
-## Edge cases
+   TaskList is session-scoped; they aren't auto-restored. Offer to
+   re-create via TaskCreate if relevant.
+   ```
 
-- Argument doesn't parse as interval — ignore, use saved cadences.
-- One CronCreate fails — continue with others, rewrite JSON keeping
-  only failed entries, report.
-- Multiple entries with same prompt (rare, if pause merged previously)
-  — restore both; user can CronDelete duplicates if undesired.
+5. **Execute each resumed prompt now** — don't wait for the first
+   cron fire. If the prompt starts with `/`, invoke via Skill;
+   else act on it as user input.
 
-## Don't
+6. **Confirm** in one short paragraph: how many jobs resumed, new
+   CronCreate IDs, cadence (note if overridden), in-flight task
+   replay status, that iter-1 ran now.
 
-- Don't silently modify prompts. Argument override applies to interval
-  only.
-- Don't try to deduplicate against currently-active jobs (resume is
-  authoritative; user can clean up after).
+## Editing state before resume
+
+"Hand-edit `~/.claude/.paused-loops.json` between pause and resume
+to change prompt, cron, recurring, or in-flight task list before
+running this skill. `/loop-resume` reads whatever's there."
+
+## Net visible tool calls per resume
+
+**2 + N** total: `Bash`(claude-loop resume) + `CronCreate`×N
+
+Down from 5+ in the prior markdown-only version.
