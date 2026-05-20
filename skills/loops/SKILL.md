@@ -48,6 +48,28 @@ claude-loop history -n 50
 
 Default N = 20.
 
+### Filtering by event type
+
+Repeatable `--filter key=value` narrows the tail. Common queries:
+
+```sh
+# Only stopped loops (audit what was permanently retired):
+claude-loop history --filter event=stopped
+
+# Only paused loops (still resumable):
+claude-loop history --filter event=paused
+
+# Combined AND-narrow — paused recurring loops only:
+claude-loop history --filter event=paused --filter recurring=true
+
+# By ID (every event for one cron job):
+claude-loop history --filter id=a27ed2e1
+```
+
+Filters AND together. Lines that don't parse as JSON are skipped
+silently (filter mode reads the whole file because "last N matching
+lines" is not the same as "last N raw lines").
+
 ## Optional argument: `/loops clear-history`
 
 Not wired into the binary (destructive ops kept out of the
