@@ -16,6 +16,11 @@
 > the latest set into `~/.claude/skills/`. See [CONTRIBUTING.md](
 > ./CONTRIBUTING.md) for the "add a new tool" workflow (Rust first,
 > token-efficient, automates a frequent task).
+>
+> **AI agents (Claude / Codex / Cursor / etc.) — read [`META.md`](./META.md)
+> first.** Single-page handoff: what this repo is, install/sync, current
+> tools, the 4 design rules, the 3-step add-a-tool recipe. ~5 min read,
+> answers every question before you start.
 
 Pause, resume, edit, and audit Claude Code cron jobs (e.g. `/loop`).
 
