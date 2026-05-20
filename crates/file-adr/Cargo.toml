@@ -1,0 +1,17 @@
+[package]
+name = "file-adr"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Scaffold an Architecture Decision Record (Nygard format) + update the index. One-shot atomic writer; agent fills the body."
+
+[[bin]]
+name = "file-adr"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+chrono = { workspace = true, features = ["serde"] }
+regex.workspace = true

@@ -21,25 +21,26 @@ FORCE=0
 [ "${1:-}" = "-f" ] && FORCE=1
 
 # ───────────────────────────────────────────────────────────────
-# Step 1 — build + install the Rust binary
+# Step 1 — build + install every Rust binary under crates/
 # ───────────────────────────────────────────────────────────────
-if [ -d "$CRATE_DIR" ]; then
-    echo "==> building claude-loop (release)…"
+if [ -d "$REPO_ROOT/crates" ]; then
     if ! command -v cargo > /dev/null 2>&1; then
         echo >&2 "error: cargo not found in PATH. Install Rust via https://rustup.rs first."
         exit 1
     fi
     mkdir -p "$BIN_DST"
-    # cargo install puts the binary at <root>/bin/<name>; we want it
-    # on PATH so user shells pick it up.
-    cargo install --path "$CRATE_DIR" --root "$(dirname "$BIN_DST")" --force --quiet
-    echo "installed: claude-loop → $BIN_DST/claude-loop"
+    for crate_dir in "$REPO_ROOT"/crates/*/; do
+        crate_name="$(basename "$crate_dir")"
+        echo "==> building $crate_name (release)…"
+        cargo install --path "$crate_dir" --root "$(dirname "$BIN_DST")" --force --quiet
+        echo "installed: $crate_name → $BIN_DST/$crate_name"
+    done
     case ":$PATH:" in
         *":$BIN_DST:"*) ;;
         *) echo "  NOTE: $BIN_DST is not on PATH — add it to your shell rc." ;;
     esac
 else
-    echo "WARN: crates/claude-loop not found at $CRATE_DIR — skipping binary build."
+    echo "WARN: crates/ not found at $REPO_ROOT/crates — skipping binary build."
     echo "      The markdown skills below will fall back to manual orchestration."
 fi
 
