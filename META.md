@@ -63,6 +63,29 @@ divergent agents.
 14 skills total. New skills get listed in README.md "Tools" section
 + get a directory under `skills/<name>/SKILL.md`.
 
+### Skill-vs-MCP allocation policy (paul 2026-05-21)
+
+> **Cap installed skills at ~15. Beyond that, the discovery + token
+> overhead exceeds the benefit. Use MCP servers for additional
+> tool surface.**
+
+The cap is a soft target, not a hard rule — intent is "improve
+quality + reduce tokens". If a 16th skill genuinely belongs, the
+right move is usually to retire a lower-value skill or fold two
+adjacent skills into one.
+
+Allocation guidance:
+
+- **Skill** = workflow / convention / when-to-use guidance.
+  Workflow shape, decision context, doctrine that the agent
+  benefits from holding in context every turn.
+- **MCP** = callable typed operation (deferred-schema-loaded so
+  it costs no context tokens until invoked). Dozens of MCP tools
+  is fine; one skill listing is in every system reminder.
+
+When in doubt: if it's a noun (a callable), it's MCP. If it's a
+verb the agent does (a way of doing work), it's a skill.
+
 ---
 
 ## 4. The 4 design rules (binding for any new tool)
